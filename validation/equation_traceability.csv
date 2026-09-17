@@ -1,0 +1,51 @@
+Componente,"Expressão no Mathematica (MOD0d, notebook v2)",Expressão no Python (double_wiebe),Unidades,Status,Observação
+Dados experimentais,Import["P_exp-Carga-3_45%.txt"][Table] (503 linhas),data_processing.read_table (503 linhas),rad e bar,idêntico,Mesmo arquivo; leitura tab-separated sem cabeçalho
+Filtro angular,"extrairIntervalo: -2 <= theta <= 2 (inclusive) -> 459 pontos","prepare_series(theta_min=-2, theta_max=2) -> 459 pontos",rad,idêntico,"n=459, theta em [-1.998401994, 1.998401994], passo 0.008726646 rad"
+Conversão de pressão,"tablePbar[[All,2]] * 10^2 (bar -> kPa)",PRESSURE_FACTORS_KPA["bar"] = 100.0,kPa,idêntico,P1 = 138.2 kPa nos dois lados
+Ordenação,"Sort[tableP, #1[[1]] < #2[[1]] &]",sort_by_angle=True (argsort),rad,idêntico,Ordem crescente garantida
+Diâmetro do cilindro,d = 86/1000,EngineConfig.bore = 0.086,m,idêntico,Constante confirmada
+Curso do pistão,s = 70/1000,EngineConfig.stroke = 0.070,m,idêntico,Constante confirmada
+Comprimento da biela,l = 117.5/1000,EngineConfig.rod_length = 0.1175,m,idêntico,Constante confirmada
+Rotação,\[Omega] = 3396.20/60,omega_rev_s = rpm/60 (rpm=3396.20),rev/s,idêntico,Constante confirmada
+Razão de calores específicos,kp = 1.37,EngineConfig.kappa = 1.37,-,idêntico,Constante confirmada
+Área do pistão,Acil = N[Pi*(d/2)^2],EngineConfig.A_p = pi*(bore/2)^2,m²,idêntico,Verificada com rtol 1e-10
+Velocidade média do pistão,Vp = 2 s \[Omega],EngineConfig.Vp = 2*stroke*omega_rev_s,m/s,idêntico,Verificada com rtol 1e-10
+Raio da manivela,r = s/2,EngineConfig.r_crank = stroke/2,m,idêntico,Verificada com rtol 1e-10
+Razão biela/manivela,R = l/r,EngineConfig.R = rod_length/r_crank,-,idêntico,Verificada com rtol 1e-10
+Volume deslocado,vd = Acil s,EngineConfig.Vd = A_p*stroke,m³,idêntico,Verificada com rtol 1e-10
+Massa de combustível,mcomb = 9.42754647351*^-6,EngineConfig.m_fuel = 9.42754647351e-6,kg/ciclo,idêntico,Constante confirmada
+Poder calorífico,PCI = 39191.3,EngineConfig.LHV = 39191.3,kJ/kg,idêntico,Constante confirmada
+Constante de Wiebe,a1 = 6.9078; a2 = 6.9078,A_WIEBE_DEFAULT = 6.9078 (a1; a2),-,idêntico,ln(1000)
+Temperatura inicial,T1 = 273.15 + 35,EngineConfig.T1 = 308.15,K,idêntico,Confirmada
+Temperatura da parede,Tw = 440,EngineConfig.Tw = 440.0,K,idêntico,Confirmada
+Volume do cilindro,"V[\[Theta]_] = vd/(Rc-1) + vd/2 (R+1-Cos[\[Theta]] - Sqrt[R^2-Sin[\[Theta]]^2)]",geometry.cylinder_volume (fórmula idêntica),m³,idêntico,"8 ângulos testados: max|ΔV| = 0 (atol 1e-12); V(0)/Vd = 1/(Rc-1)"
+Derivada do volume,"dVd\[Theta] = vd Sin[\[Theta]]/2 (1 + Cos[\[Theta]]/Sqrt[R^2-Sin[\[Theta]]^2)]",geometry.dV_dtheta (fórmula idêntica),m³/rad,idêntico,Validada também por diferença central (err rel 3.6e-10)
+Deslocamento do pistão,"y[\[Theta]_] = l + r - r Cos[\[Theta]] - Sqrt[l^2-r^2 Sin[\[Theta]]^2]",geometry.piston_disp (fórmula idêntica),m,idêntico,8 ângulos: max|Δy| = 0
+Área de transferência de calor,"As[\[Theta]_] = 2 Pi (d/2)^2 + Pi d y + Pi d s/(Rc-1)",geometry.heat_area (fórmula idêntica),m²,idêntico,8 ângulos: max|ΔAs| = 0
+Fração queimada fase 1,"x1[\[Theta]_] = If[\[Theta] >= \[Theta]01, 1-Exp[-a1 ((\[Theta]-\[Theta]01)/\[CapitalDelta]\[Theta]1)^(m1+1)], 0] (sem corte em \[Theta]01+\[CapitalDelta]\[Theta]1)",wiebe.phase_burned_fraction com máscara active = theta >= theta0 e z_safe = max(z;0) (modo continuous),-,numericamente equivalente,"Máscara evita potência fracionária de base negativa (sem NaN); cauda assintótica preservada; max|Δx1| = 0 (atol 1e-12)"
+Fração queimada fase 2,x2 análoga a x1 com (m2; \[Theta]02; \[CapitalDelta]\[Theta]2; a2),wiebe.phase_burned_fraction (fase 2),-,numericamente equivalente,Ídem fase 1
+Combinação das fases,x = \[Beta] x1 + (1-\[Beta]) x2,xb = alpha*x1 + (1-alpha)*x2,-,idêntico,\[Beta] do notebook corresponde a alpha do Python (multiplica a fase 1); verificado também em beta=1 (reduz a x1) e beta=0 (reduz a x2)
+Taxa fase 1,dx1 = a1(m1+1)/\[CapitalDelta]\[Theta]1 ((\[Theta]-\[Theta]01)/\[CapitalDelta]\[Theta]1)^m1 Exp[-a1 z^(m1+1)] (com If[\[Theta]>=\[Theta]01]),frac["dx1"] com máscara idêntica,1/rad,numericamente equivalente,Diferença finita: err rel 3.2e-10
+Taxa fase 2,dx2 análoga,frac["dx2"],1/rad,numericamente equivalente,Diferença finita: err rel 2.4e-10
+Taxa total,dx = \[Beta] dx1 + (1-\[Beta]) dx2,dxb = alpha*dx1 + (1-alpha)*dx2,1/rad,idêntico,Máx |Δ| = 1e-12
+Calor liberado,Q = mcomb PCI x; dQ/d\[Theta] = mcomb PCI dx,Q_total = engine.Q_total; dQ = Q_total * dxb,kJ/ciclo; kJ/rad,idêntico,Q_total = 0.369477802 kJ/ciclo; conservação dQ1+dQ2 = dQ_total verificada
+Coeficiente de película (Hohenberg),h = 130 V^(-0.06) (P 10^-2)^0.8 Tg^(-0.4) (Vp+1.4)^0.8,thermodynamics.hohenberg_h (fórmula idêntica),W/(m²·K),idêntico,P*10^-2 converte kPa -> bar; max|Δh| = 0
+Perda de calor na parede,Qp' = h As (Tg-Tw)/(2 Pi \[Omega]),dQw = h*As*(Tg-Tw)/(2*pi*omega_rev_s),J/rad,idêntico,Qp acumulada em J (3ª EDO)
+EDO da pressão,"P' = (1/V) ((kp-1) (dQ/d\[Theta] - Qp'/1000) - dV/d\[Theta] P kp)",make_rhs: dP = (1/V)((kappa-1)(dQ - dQw/1000) - kappa*P*dV),kPa/rad,idêntico,O /1000 converte J -> kJ; verificada ponto a ponto (casos A/B)
+EDO da temperatura,Tg' = T1/(P1 V1) (V P' + P dV/d\[Theta]),make_rhs: dTg = (T1/(P1*V1))*(V*dP + P*dV),K/rad,idêntico,Verificada ponto a ponto (casos A/B)
+Sistema de EDOs,NDSolve[{...}; {P[\[Theta]i]==P1; Tg[\[Theta]i]==T1; Qp[\[Theta]i]==0}; MaxSteps -> 10^6,thermodynamics.integrate_ode com solve_ivp DOP853 rtol=atol=1e-9 e t_eval=theta_exp (sem interpolação),kPa; K; J,numericamente equivalente,"Nos casos A e B: max|ΔP| = 7.5e-4 kPa, max|ΔTg| = 1.4e-4 K (tolerância 1.0 kPa / 1.0 K); convergência 1e-9/1e-10/1e-11: Δerro = 1.0e-4 kPa"
+Condições iniciais,"P[\[Theta]i] = P1 = tableP[[1,2]]; Tg = T1; Qp = 0","y0 = [P_exp[0], engine.T1, 0.0]",kPa; K; J,idêntico,P1 = 138.2 kPa (primeira observação ordenada)
+Função de erro (notebook),"erro = Sqrt[SSres/(q-2.)] com q = 459 (preservada; NÃO alterar)",validation.mathematica_reference.erro_notebook: sqrt(SSres/(q-2)),kPa,idêntico,Caso A: 100.537817 (referência) vs 100.538 (âncora)
+RMSE do pacote,-- (não existe no notebook),metrics.rmse = sqrt(SSE/q),kPa,divergente,Divisor q vs q-2: razão sqrt(457/459) = 1.0021858; erro do notebook e RMSE do Python calculados em colunas separadas (validation_metrics.json)
+Caso obrigatório (etapa 10),"MOD0d[15.34; 0.6; -8°; 15°; 0.141; 2.83°; 62.06°; 0.063] -> erro = 100.538 kPa",mesmo vetor no pipeline -> 100.537707 kPa,kPa,idêntico,"|Δ| = 0.000293 kPa (tolerância 0.5 kPa)"
+Vetor ativo do PSO (etapa 11),k=190: {15.3496; 0.6; -0.193038; 0.436332; 0.9; 0.0317214; 0.523599; 0.075285} -> erro = 55.381 kPa,mesmo vetor no pipeline -> 55.380933 kPa,kPa,idêntico,"|Δ| = 0.000067 kPa (tolerância 0.5 kPa)"
+Vetor comentado (auxiliar),"célula comentada; k=532: {15.340724668321869; 0.5999990714343; -0.13962634015954636; 0.2617993877991494; 0.14162900274166848; 0.04937752133906362; 1.082970478069876; 0.06333317846901508} -> 34.25858860927897",mesmo vetor -> 100.557384 kPa,kPa,divergente,"Saída histórica de célula comentada, inconsistente com o MOD0d ativo (a referência independente também dá 100.557508; Δ ref-vs-python = 1.2e-4 kPa). Variantes testadas (calor off; beta no outro ramo; kp; a; Tw; T1; 503 pontos; permutações de ordem) não reproduzem 34.2586. Ressalva documentada; não é critério obrigatório"
+PSO: estrutura,nvar=8; np=40; beta=2; kmax=500; krmax=10; tol=1e-7,calibration._run_pso (pso_particles; pso_beta=2; pso_max_iter; pso_max_stall; tol),-,numericamente equivalente,Estrutura idêntica; validação via avaliação direta dos vetores (trajetória estocástica não exigida pela especificação)
+Atualização das partículas,popaux += beta r1 (pop - popaux) + beta r2 (pop - pop[[jbest]]); clamp [li;ls],X += pso_beta*r1*(P_best-X) + pso_beta*r2*(P_best[jbest]-X); clip,-,idêntico,Sem inércia; fator beta comum (como no notebook)
+Critério de parada,kr >= 10 com ermax = max|gbest - gbestold| <= 1e-7 (contador consecutivo),stall: kr = kr+1 if ermax <= tol else 0,-,idêntico,Contador de estagnação consecutivo
+Limites de calibração,"li = {15; 0.05; -16°; 5°; 0.9; 0°; 30°; 0.05}; ls = {16; 0.6; 0°; 25°; 2.5; 8°; 70°; 0.6}",PARAM_SPECS: Rc[14;20]; theta01[-30°;10°]; delta1[2°;40°]; m1[0.05;3]; a1[1;10]; theta02[-20°;40°]; delta2[5°;90°]; m2[0.05;3]; a2[1;10]; alpha[0.05;0.95],-,divergente,Generalização intencional do pacote (superset dos limites do notebook); não afeta a avaliação de vetores fixos; documentada como ressalva
+Ordem dos parâmetros,"MOD0d[Rc; m1; \[Theta]01; \[CapitalDelta]\[Theta]1; m2; \[Theta]02; \[CapitalDelta]\[Theta]2; \[Beta]]",PARAM_ORDER: Rc; theta01; delta1; m1; a1; theta02; delta2; m2; a2; alpha,-,divergente,Ordem diferente por design (a1/a2 explícitos e calibráveis); mapeamento funcional correto e verificado numericamente
+Modo bounded (platô),-- (não existe no notebook),WiebeParameters.mode="bounded" (fase constante 1-exp(-a) após theta0+delta),-,não implementado (no notebook),Extensão do Python; default é "continuous" (equivalente ao notebook)
+Restrição theta02 >= theta01,-- (não imposta no notebook),WiebeParameters.validate() impõe theta02 >= theta01,-,divergente,Restrição física adicional do Python; sem efeito nos casos A/B/C (todos satisfazem)
+Métricas adicionais,-- ,metrics.summary_metrics (SSE; MSE; MAE; R²; max_abs; mean_percent),kPa; %,não implementado (no notebook),Extensão do Python; não interfere na paridade
+Wolfram Engine,-- ,-- ,-,não verificável,Sem wolframscript/WolframKernel no ambiente: a coluna "Mathematica" da comparação ponto a ponto vem de re-implementação independente das equações extraídas do notebook/PDF; validação externa pelas âncoras 100.538 e 55.381 kPa (ambas reproduzidas com |Δ| < 3e-4 kPa)

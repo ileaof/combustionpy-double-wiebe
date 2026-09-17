@@ -1,0 +1,672 @@
+{
+  "dados": {
+    "n_total": 503,
+    "n_filtrado": 459,
+    "theta_min": -1.998401994,
+    "theta_max": 1.998401994,
+    "passo_medio": 0.008726646262008734,
+    "P1_kPa": 138.2
+  },
+  "tolerancias": {
+    "erro_global_kPa": 0.5,
+    "dP_kPa": 1.0,
+    "dTg_K": 1.0,
+    "erro_relativo_P": 0.001,
+    "rtol_algebrico": 1e-10,
+    "atol_algebrico": 1e-12
+  },
+  "casos_ancora": {
+    "A (caso obrigatorio)": {
+      "vetor": [
+        15.34,
+        0.6,
+        -0.13962634015954636,
+        0.2617993877991494,
+        0.141,
+        0.04939281783143953,
+        1.083151333787681,
+        0.063
+      ],
+      "erro_ancora_mathematica": 100.538,
+      "erro_referencia_independente": 100.53781676780777,
+      "erro_python_pipeline": 100.53770681990109,
+      "erro_python_rmse_q": 100.3184312986101,
+      "delta_ref_ancora": -0.0001832321922279334,
+      "delta_python_ancora": -0.0002931800989074418,
+      "max_dP_ref_vs_python_kPa": 0.0007527074949393864,
+      "max_dTg_ref_vs_python_K": 0.00014107561537457514,
+      "erro_relativo_max_P": 1.7371961949212576e-07,
+      "pass": true
+    },
+    "B (PSO ativo, k=190)": {
+      "vetor": [
+        15.3496,
+        0.6,
+        -0.193038,
+        0.436332,
+        0.9,
+        0.0317214,
+        0.523599,
+        0.075285
+      ],
+      "erro_ancora_mathematica": 55.381,
+      "erro_referencia_independente": 55.38092031667249,
+      "erro_python_pipeline": 55.38093273894531,
+      "erro_python_rmse_q": 55.26014539178941,
+      "delta_ref_ancora": -7.96833275131803e-05,
+      "delta_python_ancora": -6.726105468857213e-05,
+      "max_dP_ref_vs_python_kPa": 0.00023529068766947603,
+      "max_dTg_ref_vs_python_K": 4.381549194931722e-05,
+      "erro_relativo_max_P": 5.369217704486769e-08,
+      "pass": true
+    },
+    "C (vetor comentado, auxiliar)": {
+      "vetor": [
+        15.340724668321869,
+        0.5999990714343,
+        -0.13962634015954636,
+        0.2617993877991494,
+        0.14162900274166848,
+        0.04937752133906362,
+        1.082970478069876,
+        0.06333317846901508
+      ],
+      "erro_ancora_mathematica": 34.25858860927897,
+      "erro_referencia_independente": 100.55750759857472,
+      "erro_python_pipeline": 100.55738369520625,
+      "erro_python_rmse_q": 100.33806525810559,
+      "delta_ref_ancora": 66.29891898929574,
+      "delta_python_ancora": 66.29879508592728,
+      "max_dP_ref_vs_python_kPa": 0.0008977723682619398,
+      "max_dTg_ref_vs_python_K": 0.00016690362258486857,
+      "erro_relativo_max_P": 2.2238292700990842e-07,
+      "pass": false,
+      "nota": "Resultado 34.25858860927897 provem de celula COMENTADA do notebook (k=532), inconsistente com o MOD0d ativo: o mesmo vetor avaliado pelo MOD0d ativo (re-implementado) e pelo pipeline Python da 100.5575/100.5574 kPa (diferenca entre as duas de 1.2e-4 kPa). Variants testados (calor desligado, beta no outro ramo, kp, a, Tw, T1, 503 pontos, permutacoes de ordem) nao reproduzem 34.2586. Evidencia de saida historica de estado anterior do notebook; teste auxiliar, nao faz parte dos criterios obrigatorios (A e B)."
+    }
+  },
+  "funcao_erro": {
+    "notebook": "sqrt(SSres/(q-2))",
+    "python_metrics_rmse": "sqrt(SSE/q)",
+    "q": 459,
+    "erro_notebook_casoA": 100.53781676780777,
+    "rmse_python_casoA": 100.31854100671734,
+    "razao": 1.0021857949576414
+  },
+  "ponto_a_ponto_casoA": {
+    "max_dP_kPa": 0.0007527074949393864,
+    "max_dP_percentual": 1.7371961949212577e-05,
+    "max_dTg_K": 0.00014107561537457514
+  },
+  "checks": [
+    {
+      "etapa": 2,
+      "item": "n_total",
+      "ref": 503,
+      "py": 503,
+      "tol": 0,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 2,
+      "item": "n_filtrado",
+      "ref": 459,
+      "py": 459,
+      "tol": 0,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 2,
+      "item": "theta_min [rad]",
+      "ref": -1.998401994,
+      "py": -1.998401994,
+      "tol": 1e-09,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 2,
+      "item": "theta_max [rad]",
+      "ref": 1.998401994,
+      "py": 1.998401994,
+      "tol": 1e-09,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 2,
+      "item": "passo_medio [rad]",
+      "ref": 0.008726646,
+      "py": 0.008726646262008734,
+      "tol": 1e-09,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 2,
+      "item": "P1 [kPa]",
+      "ref": 138.2,
+      "py": 138.2,
+      "tol": 1e-06,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 2,
+      "item": "serie identica (ref x prepare_series)",
+      "ref": 0.0,
+      "py": 0.0,
+      "tol": 0.0,
+      "ok": true,
+      "obs": "elemento a elemento, bit a bit"
+    },
+    {
+      "etapa": 3,
+      "item": "bore d [m]",
+      "ref": 0.086,
+      "py": 0.086,
+      "tol": 1e-10,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 3,
+      "item": "stroke s [m]",
+      "ref": 0.07,
+      "py": 0.07,
+      "tol": 1e-10,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 3,
+      "item": "rod l [m]",
+      "ref": 0.1175,
+      "py": 0.1175,
+      "tol": 1e-10,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 3,
+      "item": "kappa",
+      "ref": 1.37,
+      "py": 1.37,
+      "tol": 1.3700000000000002e-10,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 3,
+      "item": "rpm/60 [rev/s]",
+      "ref": 56.60333333333333,
+      "py": 56.60333333333333,
+      "tol": 5.660333333333333e-09,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 3,
+      "item": "A_p [m2]",
+      "ref": 0.005808804816487527,
+      "py": 0.005808804816487527,
+      "tol": 1e-10,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 3,
+      "item": "Vp [m/s]",
+      "ref": 7.924466666666667,
+      "py": 7.924466666666667,
+      "tol": 7.924466666666668e-10,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 3,
+      "item": "r [m]",
+      "ref": 0.035,
+      "py": 0.035,
+      "tol": 1e-10,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 3,
+      "item": "R [-]",
+      "ref": 3.3571428571428568,
+      "py": 3.3571428571428568,
+      "tol": 3.357142857142857e-10,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 3,
+      "item": "Vd [m3]",
+      "ref": 0.00040661633715412693,
+      "py": 0.00040661633715412693,
+      "tol": 1e-10,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 3,
+      "item": "mcomb [kg]",
+      "ref": 9.42754647351e-06,
+      "py": 9.42754647351e-06,
+      "tol": 1e-10,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 3,
+      "item": "PCI [kJ/kg]",
+      "ref": 39191.3,
+      "py": 39191.3,
+      "tol": 3.919130000000001e-06,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 3,
+      "item": "T1 [K]",
+      "ref": 308.15,
+      "py": 308.15,
+      "tol": 3.0815e-08,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 3,
+      "item": "Tw [K]",
+      "ref": 440.0,
+      "py": 440.0,
+      "tol": 4.4000000000000004e-08,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 4,
+      "item": "max|dV| V ref x py",
+      "ref": 0.0,
+      "py": 0.0,
+      "tol": 1e-12,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 4,
+      "item": "max|dV| dV ref x py",
+      "ref": 0.0,
+      "py": 0.0,
+      "tol": 1e-12,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 4,
+      "item": "max|dV| y ref x py",
+      "ref": 0.0,
+      "py": 0.0,
+      "tol": 1e-12,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 4,
+      "item": "max|dV| As ref x py",
+      "ref": 0.0,
+      "py": 0.0,
+      "tol": 1e-12,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 4,
+      "item": "DF central dV/dtheta (erro relativo)",
+      "ref": 0.0,
+      "py": 3.593823243818321e-10,
+      "tol": 1e-06,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 4,
+      "item": "V(0)/Vd vs 1/(Rc-1)",
+      "ref": 0.0697350069735007,
+      "py": 0.0697350069735007,
+      "tol": 1e-12,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 5,
+      "item": "max|x1| ref x py",
+      "ref": 0.0,
+      "py": 0.0,
+      "tol": 1e-12,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 5,
+      "item": "max|x2| ref x py",
+      "ref": 0.0,
+      "py": 0.0,
+      "tol": 1e-12,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 5,
+      "item": "max|xb| ref x py",
+      "ref": 0.0,
+      "py": 0.0,
+      "tol": 1e-12,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 5,
+      "item": "max|dx1| ref x py",
+      "ref": 0.0,
+      "py": 0.0,
+      "tol": 1e-12,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 5,
+      "item": "max|dx2| ref x py",
+      "ref": 0.0,
+      "py": 0.0,
+      "tol": 1e-12,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 5,
+      "item": "max|dxb| ref x py",
+      "ref": 0.0,
+      "py": 0.0,
+      "tol": 1e-12,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 5,
+      "item": "x1 = 0 antes de theta01 (max)",
+      "ref": 0.0,
+      "py": 0.0,
+      "tol": 0.0,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 5,
+      "item": "x2 = 0 antes de theta02 (max)",
+      "ref": 0.0,
+      "py": 0.0,
+      "tol": 0.0,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 5,
+      "item": "dx1 = 0 antes de theta01 (max)",
+      "ref": 0.0,
+      "py": 0.0,
+      "tol": 0.0,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 5,
+      "item": "dx2 = 0 antes de theta02 (max)",
+      "ref": 0.0,
+      "py": 0.0,
+      "tol": 0.0,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 5,
+      "item": "DF dx1/dtheta (erro relativo)",
+      "ref": 0.0,
+      "py": 3.1631310090011894e-10,
+      "tol": 1e-06,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 5,
+      "item": "DF dx2/dtheta (erro relativo)",
+      "ref": 0.0,
+      "py": 2.3991080251826364e-10,
+      "tol": 1e-06,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 5,
+      "item": "xb = beta*x1 + (1-beta)*x2 (max)",
+      "ref": 0.0,
+      "py": 0.0,
+      "tol": 1e-14,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 5,
+      "item": "beta=1 -> x = x1 (max)",
+      "ref": 0.0,
+      "py": 0.0,
+      "tol": 1e-14,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 5,
+      "item": "beta=0 -> x = x2 (max)",
+      "ref": 0.0,
+      "py": 0.0,
+      "tol": 1e-14,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 5,
+      "item": "NaN em z<0 com m=0.3 (contagem)",
+      "ref": 0.0,
+      "py": 0.0,
+      "tol": 0.0,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 6,
+      "item": "Q_total [kJ/ciclo]",
+      "ref": 0.3694778021072725,
+      "py": 0.3694778021072725,
+      "tol": 3.694778021072725e-11,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 6,
+      "item": "dQ1 + dQ2 = dQ_total (max)",
+      "ref": 0.0,
+      "py": 2.220446049250313e-16,
+      "tol": 1e-12,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 6,
+      "item": "int dQ/dtheta (numérico) [kJ/ciclo]",
+      "ref": 0.3694778021072725,
+      "py": 0.3709183380881755,
+      "tol": 0.01,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 7,
+      "item": "max|h| ref x py",
+      "ref": 0.0,
+      "py": 0.0,
+      "tol": 1e-09,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 8,
+      "item": "A (caso obrigatorio): erro ref x ancora",
+      "ref": 100.538,
+      "py": 100.53781676780777,
+      "tol": 0.5,
+      "ok": true,
+      "obs": "kPa"
+    },
+    {
+      "etapa": 8,
+      "item": "A (caso obrigatorio): erro python x ancora",
+      "ref": 100.538,
+      "py": 100.53770681990109,
+      "tol": 0.5,
+      "ok": true,
+      "obs": "kPa"
+    },
+    {
+      "etapa": 8,
+      "item": "A (caso obrigatorio): max|dP| ref x py",
+      "ref": 0.0,
+      "py": 0.0007527074949393864,
+      "tol": 1.0,
+      "ok": true,
+      "obs": "kPa"
+    },
+    {
+      "etapa": 8,
+      "item": "A (caso obrigatorio): max|dTg| ref x py",
+      "ref": 0.0,
+      "py": 0.00014107561537457514,
+      "tol": 1.0,
+      "ok": true,
+      "obs": "K"
+    },
+    {
+      "etapa": 8,
+      "item": "B (PSO ativo, k=190): erro ref x ancora",
+      "ref": 55.381,
+      "py": 55.38092031667249,
+      "tol": 0.5,
+      "ok": true,
+      "obs": "kPa"
+    },
+    {
+      "etapa": 8,
+      "item": "B (PSO ativo, k=190): erro python x ancora",
+      "ref": 55.381,
+      "py": 55.38093273894531,
+      "tol": 0.5,
+      "ok": true,
+      "obs": "kPa"
+    },
+    {
+      "etapa": 8,
+      "item": "B (PSO ativo, k=190): max|dP| ref x py",
+      "ref": 0.0,
+      "py": 0.00023529068766947603,
+      "tol": 1.0,
+      "ok": true,
+      "obs": "kPa"
+    },
+    {
+      "etapa": 8,
+      "item": "B (PSO ativo, k=190): max|dTg| ref x py",
+      "ref": 0.0,
+      "py": 4.381549194931722e-05,
+      "tol": 1.0,
+      "ok": true,
+      "obs": "K"
+    },
+    {
+      "etapa": 8,
+      "item": "C (vetor comentado, auxiliar): erro ref x ancora",
+      "ref": 34.25858860927897,
+      "py": 100.55750759857472,
+      "tol": 0.5,
+      "ok": false,
+      "obs": "kPa"
+    },
+    {
+      "etapa": 8,
+      "item": "C (vetor comentado, auxiliar): erro python x ancora",
+      "ref": 34.25858860927897,
+      "py": 100.55738369520625,
+      "tol": 0.5,
+      "ok": false,
+      "obs": "kPa"
+    },
+    {
+      "etapa": 8,
+      "item": "C (vetor comentado, auxiliar): max|dP| ref x py",
+      "ref": 0.0,
+      "py": 0.0008977723682619398,
+      "tol": 1.0,
+      "ok": true,
+      "obs": "kPa"
+    },
+    {
+      "etapa": 8,
+      "item": "C (vetor comentado, auxiliar): max|dTg| ref x py",
+      "ref": 0.0,
+      "py": 0.00016690362258486857,
+      "tol": 1.0,
+      "ok": true,
+      "obs": "K"
+    },
+    {
+      "etapa": 8,
+      "item": "convergencia rtol 1e-9/1e-10/1e-11 (max|d erro|)",
+      "ref": 0.0,
+      "py": 0.0001007000277439829,
+      "tol": 0.001,
+      "ok": true,
+      "obs": "kPa"
+    },
+    {
+      "etapa": 9,
+      "item": "metrics.rmse (q) x sqrt(SSE/q)",
+      "ref": 100.31854100671734,
+      "py": 100.31854100671734,
+      "tol": 1e-12,
+      "ok": true,
+      "obs": ""
+    },
+    {
+      "etapa": 9,
+      "item": "razao erro(q-2)/rmse(q) = sqrt(q/(q-2))",
+      "ref": 1.0021857949576414,
+      "py": 1.0021857949576414,
+      "tol": 1e-12,
+      "ok": true,
+      "obs": "divergencia documentada: notebook usa q-2"
+    },
+    {
+      "etapa": 12,
+      "item": "max|dP| ponto a ponto (459)",
+      "ref": 0.0,
+      "py": 0.0007527074949393864,
+      "tol": 1.0,
+      "ok": true,
+      "obs": "kPa"
+    }
+  ],
+  "n_checks": 63,
+  "n_falhas": 2,
+  "limitacao": "Sem Wolfram Engine no ambiente: a coluna 'Mathematica' ponto a ponto vem de uma re-implementacao independente das equacoes extraidas do notebook; a validacao externa usa as ancoras numericas 100.538 / 55.381 / 34.2586 kPa."
+}
