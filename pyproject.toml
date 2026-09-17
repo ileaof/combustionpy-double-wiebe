@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "double-wiebe"
+version = "1.0.0"
+description = "Double Wiebe Combustion Analysis — two-phase Wiebe model with CLI (Typer) and GUI (Streamlit)"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "L. Queiroz / I. L. Ferreira (modelo Single Wiebe); extensão Double Wiebe" }]
+keywords = ["combustion", "wiebe", "engine", "thermodynamics", "calibration"]
+dependencies = [
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "scipy>=1.10",
+    "plotly>=5.18",
+    "matplotlib>=3.7",
+    "streamlit>=1.30",
+    "typer>=0.9",
+    "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
+
+[project.scripts]
+double-wiebe = "double_wiebe.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

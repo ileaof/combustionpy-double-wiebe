@@ -1,0 +1,75 @@
+# =====================================================================
+# Configuração de exemplo — Double Wiebe Combustion Analysis
+# Uso: double-wiebe simulate --data data/example_pressure.txt \
+#        --config configs/example.yaml --output outputs/run_01
+# Ângulos do Wiebe estão em GRAUS neste arquivo (convertidos para
+# radianos internamente). Sobrescritas rápidas:
+#   --set wiebe.alpha=0.4 --set calibration.seed=42
+# =====================================================================
+data:                               # opções de leitura do arquivo experimental
+  angle_col: 0                      # coluna do ângulo (0-based)
+  pressure_col: 1                   # coluna da pressão (0-based)
+  angle_unit: radianos              # radianos | graus
+  pressure_unit: bar                # Pa | kPa | bar (arquivo de exemplo: bar)
+  theta_min: -2.0                   # filtro de intervalo [rad]
+  theta_max: 2.0                    # filtro de intervalo [rad]
+  sep: auto                         # auto | whitespace | ',' | ';' | tab
+  has_header: none                  # auto | none | header
+
+engine:
+  bore_mm: 86.0                     # diâmetro do cilindro [mm]
+  stroke_mm: 70.0                   # curso do pistão [mm]
+  rod_length_mm: 117.5              # comprimento da biela [mm]
+  n_cylinders: 1                    # número de cilindros
+  rpm: 3396.20                      # rotação [rpm]
+  Rc: 17.0                          # razão de compressão [-]
+  m_fuel_kg_per_cycle: 9.42754647351e-06
+  LHV_kJ_per_kg: 39191.3            # PCI/LHV [kJ/kg]
+  kappa: 1.37                       # razão de calores específicos [-]
+  T1_K: 308.15                      # temperatura inicial (IVC) [K]
+  Tw_K: 440.0                       # temperatura da parede [K]
+  heat_transfer: true               # perda de calor por Hohenberg
+
+wiebe:
+  mode: continuous                  # continuous | bounded
+  theta01_deg: -6.54                # início da fase 1 (pré-misturada) [°]
+  delta1_deg: 25.0                  # duração da fase 1 [°]
+  m1: 0.5                           # fator de forma da fase 1 [-]
+  a1: 6.9078                        # eficiência da fase 1 [-]
+  theta02_deg: 10.0                 # início da fase 2 (difusão) [°]
+  delta2_deg: 55.0                  # duração da fase 2 [°]
+  m2: 1.0                           # fator de forma da fase 2 [-]
+  a2: 6.9078                        # eficiência da fase 2 [-]
+  alpha: 0.40                       # fração de energia da fase 1 [-]
+
+simulation:
+  method: DOP853                    # DOP853 | LSODA | RK45
+  rtol: 1.0e-09
+  atol: 1.0e-09
+
+calibration:
+  method: differential-evolution    # differential-evolution | pso | least-squares
+  selected:                         # parâmetros livres (os demais ficam fixos)
+    - Rc
+    - theta01
+    - delta1
+    - m1
+    - theta02
+    - delta2
+    - m2
+    - alpha
+  seed: 42                          # semente aleatória (reprodutibilidade)
+  maxiter: 200
+  popsize: 20
+  tol: 1.0e-10
+  polish: true                      # refinamento least-squares final
+  pso_particles: 20
+  pso_beta: 2.0
+  pso_max_iter: 300
+  pso_max_stall: 10
+  regularization:                   # pesos das penalidades (0 desativa)
+    w_order: 1.0e+04                # theta02 >= theta01
+    w_overlap: 1.0e+04              # sobreposição forte das fases
+    w_min_duration: 1.0e+04         # durações mínimas
+    delta_min_deg: 5.0              # duração mínima física [°]
+    w_ridge: 0.0                    # ridge (afastar das bordas) — desativado
