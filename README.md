@@ -24,6 +24,15 @@ pip install -e .            # instala o pacote + o comando `double-wiebe`
 pip install -r requirements.txt
 ```
 
+Extras opcionais (o programa funciona **sem nenhum deles**):
+
+```bash
+pip install -e ".[cpu]"     # numba: RK4 em lote compilado (backend cpu)
+pip install -e ".[dev]"     # pytest
+pip install -e ".[cuda]"    # opcional: detecção CUDA (cupy) — ver docs/hpc.md
+pip install -e ".[opencl]"  # opcional: detecção OpenCL (pyopencl)
+```
+
 Verificação rápida:
 
 ```bash
@@ -81,11 +90,37 @@ parâmetros fisicamente identificados (por ex. `theta01, delta1, alpha`) e
 observe os alertas de *sensibilidade/bordas* impressos ao final — parâmetros
 "insensíveis" indicam identificabilidade fraca.
 
+#### Backends de desempenho (plano HPC)
+
+A calibração pode usar backends acelerados sem alterar as equações:
+
+```bash
+double-wiebe calibrate --data ... --backend cpu --seed 42          # RK4 em lote (NumPy/Numba)
+double-wiebe calibrate --data ... --backend cpu-parallel --seed 42 # processos, idêntico à serial
+double-wiebe calibrate --data ... --backend auto --seed 42         # escolhe por mini-benchmark
+```
+
+| Flag | Valores | Efeito |
+|---|---|---|
+| `--backend` | `serial` \| `cpu` \| `cpu-parallel` \| `auto` | serial é a referência; `cpu` avalia a população com RK4 de passo fixo em lote (a diferença de objetivo é medida e o resultado final é sempre re-integrado com solve_ivp); `cpu-parallel` usa a implementação serial em processos (resultados **idênticos**); `auto` escolhe por mini-benchmark |
+| `--integrator` | `auto` \| `rk4_numpy` \| `rk4_numba` \| `scipy` | integrador do backend `cpu` |
+| `--workers` | inteiro | processos do `cpu-parallel` (default: núcleos−1) |
+| `--batch-size` | inteiro | candidatos por lote do `cpu` (0 = todos) |
+| `--precision` | `float64` \| `float32` | precisão do modo acelerado (o re-run final é sempre float64) |
+| `--substeps` | inteiro | sub-passos do RK4 em lote (default 4) |
+| `--benchmark` | — | mede os backends e grava `benchmark_hpc.csv` na saída |
+| `--profile` | — | perfil cProfile da calibração (`profile_calibracao.pstats`) |
+
+Detalhes, garantias numéricas e justificativa do descarte de CUDA/OpenCL:
+`docs/hpc.md`.
+
 ### 2.5 Outros comandos
 
 | Comando | Função |
 |---|---|
 | `double-wiebe validate --data ... --config ...` | valida dados/config sem simular |
+| `double-wiebe devices` | hardware detectado (CPU, numba, CUDA, OpenCL) + backends disponíveis |
+| `double-wiebe benchmark [--data ...]` | benchmark reproduzível dos backends (warm-up, média, desvio, speedup, CSV) |
 | `double-wiebe plot outputs/run_01 --out outputs/figs` | regenera gráficos de um resultado |
 | `double-wiebe gui` | abre a interface gráfica (Streamlit) |
 | `double-wiebe example-config [arquivo]` | imprime/grava YAML de exemplo |
@@ -183,13 +218,17 @@ imagens embutidas).
 
 ```bash
 python -m pytest tests -q
+python -m pytest tests -m "not slow" -q     # sem os testes longos
 ```
 
 Cobrem: Wiebe (zero antes do início, monotonia, derivada analítica,
 modos, redução ao Single Wiebe), geometria (volume/derivada/área),
 simulação (sem NaN, indicadores, penalidade), calibração (reprodutibilidade,
-limites, regularização), dados (unidades, filtros, erros) e CLI
-(códigos de saída, `--set`, proteção de diretório, equivalência CLI×núcleo).
+limites, regularização), dados (unidades, filtros, erros), CLI
+(códigos de saída, `--set`, proteção de diretório, equivalência CLI×núcleo)
+e **backends HPC** (`test_backends.py`: equivalência serial↔cpu-parallel
+bit a bit, tolerância RK4↔solve_ivp ≤ 5 kPa, rk4_numpy≡rk4_numba,
+PENALTY sem NaN, fallback, reprodutibilidade).
 
 ## 8. Estrutura
 
@@ -200,10 +239,14 @@ double_wiebe/
 ├── configs/example.yaml
 ├── data/example_pressure.txt
 ├── outputs/                     # resultados (não versionados)
+├── docs/hpc.md                  # arquitetura de aceleração + benchmarks
 ├── src/double_wiebe/
 │   ├── __init__.py   models.py  wiebe.py  geometry.py
 │   ├── thermodynamics.py  simulation.py  calibration.py
 │   ├── data_processing.py metrics.py  plotting.py
+│   ├── integrators/  (scipy referência; RK4 em lote NumPy e Numba)
+│   ├── backends/     (ComputeBackend: serial, cpu, cpu-parallel,
+│   │                  detection, benchmark, select_backend/auto)
 │   ├── reporting.py   cli.py    gui.py
 └── tests/
 ```

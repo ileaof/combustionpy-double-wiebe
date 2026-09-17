@@ -23,7 +23,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=7.0"]
+# Aceleração (plano HPC): a base roda sem nenhum extra (regras 5/6).
+cpu = ["numba>=0.59"]           # RK4 em lote compilado (backend cpu)
+cuda = ["cupy-cuda12x>=13.0"]   # opcional — detecção em backends.detection
+opencl = ["pyopencl"]           # opcional — detecção em backends.detection
+gui = ["streamlit>=1.30"]
+dev = ["pytest>=7.0", "pytest-timeout>=2.1", "streamlit>=1.30"]
 
 [project.scripts]
 double-wiebe = "double_wiebe.cli:main"
@@ -33,3 +38,6 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "slow: testes longos (benchmark, multiprocessing, DE completo)",
+]

@@ -26,6 +26,7 @@ import pandas as pd
 import streamlit as st
 
 from double_wiebe.calibration import PARAM_SPECS, apply_calibrated
+from double_wiebe.backends import hardware_report
 from double_wiebe.data_processing import (ANGLE_FACTORS_RAD, PRESSURE_FACTORS_KPA,
                               DataError, read_table)
 from double_wiebe import DESCRIPTION_EN
@@ -563,6 +564,42 @@ with TAB_CALIB:
                     hi = st.number_input(f"{nome} máx", value=float(spec["upper"]),
                                          key=f"lim_hi_{nome}")
                 limites_ui[nome] = (lo, hi)
+
+        # --- Desempenho (plano HPC) --------------------------------------
+        with st.expander("Desempenho (backend de computação)"):
+            st.caption("serial = referência (solve_ivp). cpu = RK4 em lote "
+                       "(NumPy/Numba; resultado re-validado com solve_ivp). "
+                       "cpu-parallel = processos com a implementação serial "
+                       "(idêntica à referência). auto = escolhe por "
+                       "mini-benchmark.")
+            hc1, hc2, hc3 = st.columns(3)
+            with hc1:
+                backend_cal = st.selectbox(
+                    "Backend", list(CalibrationConfig.BACKENDS),
+                    key="calib_backend")
+                precision_cal = st.selectbox(
+                    "Precisão (modo acelerado)",
+                    list(CalibrationConfig.PRECISIONS), key="calib_precision",
+                    help="float32 é mais rápido, mas o resultado final é "
+                         "sempre re-integrado em float64 com solve_ivp.")
+            with hc2:
+                integrador_cal = st.selectbox(
+                    "Integrador (backend cpu)",
+                    list(CalibrationConfig.INTEGRATORS), key="calib_integ")
+                batch_cal = st.number_input(
+                    "Candidatos por lote (0 = todos)", 0, 100000, 0,
+                    key="calib_batch")
+            with hc3:
+                workers_cal = st.number_input(
+                    "Processos (cpu-parallel)", 0, 64, 0, key="calib_workers",
+                    help="0 = automático (núcleos lógicos − 1); "
+                         "1 = serial no processo principal.")
+                substeps_cal = st.number_input(
+                    "Sub-passos do RK4", 1, 64, 4, key="calib_substeps",
+                    help="Mais sub-passos = mais preciso e mais lento.")
+            with st.expander("Hardware detectado"):
+                st.text(hardware_report())
+
         iniciar = st.form_submit_button("Start calibration", type="primary")
         cancelar = st.form_submit_button("Cancel calibration",
                                          disabled=not st.session_state.calib_running)
@@ -590,7 +627,11 @@ with TAB_CALIB:
                     method=metodo_cal, selected=selecionados,
                     seed=(int(seed_cal) if seed_cal else None),
                     maxiter=int(maxiter_cal), popsize=int(popsize_cal),
-                    tol=tol_cal, polish=polish_cal)
+                    tol=tol_cal, polish=polish_cal,
+                    backend=backend_cal, integrator=integrador_cal,
+                    workers=(int(workers_cal) if workers_cal else None),
+                    batch_size=int(batch_cal), precision=precision_cal,
+                    substeps=int(substeps_cal))
                 progress = {"cancel": False}
                 st.session_state.calib_progress = progress
                 st.session_state.calib_running = True
@@ -640,6 +681,16 @@ with TAB_CALIB:
                     f"(método **{cal['method']}**, semente **{cal['seed']}**, "
                     f"{cal['iteracoes']} iterações, RMSE = "
                     f"**{cal['rmse']:.6g} kPa**):")
+        if cal.get("backend", "serial") != "serial":
+            p1, p2, p3 = st.columns(3)
+            p1.metric("Backend", str(cal.get("backend")))
+            p2.metric("Tempo da calibração [s]",
+                      f"{cal.get('tempo_s', float('nan')):.2f}")
+            p3.metric("Diferença do integrador [kPa]",
+                      f"{cal.get('diferenca_integrador', float('nan')):.3g}",
+                      help="|RMSE(re-run serial) − RMSE(integrador "
+                           "acelerado)| no melhor candidato. O RMSE "
+                           "exibido é sempre do re-run com solve_ivp.")
         tabela = pd.DataFrame({
             "Parâmetro": list(cal["params"]),
             "Inicial": [cal["params_initial"][n] for n in cal["params"]],

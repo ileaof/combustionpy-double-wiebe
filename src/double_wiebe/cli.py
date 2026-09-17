@@ -154,6 +154,13 @@ def _imprimir_resumo(res, calibration: Optional[dict], verbose: bool) -> None:
             f"  calibração          : {calibration['method']} | "
             f"semente {calibration['seed']} | "
             f"{calibration['iteracoes']} iterações", fg="cyan")
+        if calibration.get("backend") and calibration["backend"] != "serial":
+            typer.secho(
+                f"  backend             : {calibration['backend']} | "
+                f"tempo {calibration.get('tempo_s', float('nan')):.2f} s | "
+                f"diferença do integrador (re-run serial): "
+                f"{calibration.get('diferenca_integrador', float('nan')):.3e}",
+                fg="cyan")
         for nome, valor in calibration["params"].items():
             ini = calibration["params_initial"][nome]
             marcado = "*" if nome in calibration["selected"] else " "
@@ -258,6 +265,30 @@ def calibrate(
     select: Optional[str] = typer.Option(
         None, "--select", help="Parâmetros livres separados por vírgula "
         "(ex.: Rc,m1,alpha)."),
+    # --- desempenho (plano HPC) -------------------------------------------
+    backend: Optional[str] = typer.Option(
+        None, "--backend", help="serial | cpu | cpu-parallel | auto "
+        "(default: serial)."),
+    integrator: Optional[str] = typer.Option(
+        None, "--integrator", help="Integrador do backend cpu: auto | "
+        "rk4_numpy | rk4_numba | scipy (default: auto)."),
+    workers: Optional[int] = typer.Option(
+        None, "--workers", help="Processos do cpu-parallel (default: "
+        "núcleos-1)."),
+    batch_size: Optional[int] = typer.Option(
+        None, "--batch-size", help="Candidatos por lote do backend cpu "
+        "(0 = todos de uma vez)."),
+    precision: Optional[str] = typer.Option(
+        None, "--precision", help="float64 | float32 (só no modo acelerado)."),
+    substeps: Optional[int] = typer.Option(
+        None, "--substeps", help="Sub-passos do RK4 em lote (default: 4)."),
+    benchmark: bool = typer.Option(
+        False, "--benchmark", help="Executa o benchmark dos backends antes "
+        "da calibração e grava benchmark_hpc.csv na saída."),
+    profile: bool = typer.Option(
+        False, "--profile", help="Perfil (cProfile) da calibração; grava "
+        "profile_calibracao.pstats na saída."),
+    # -----------------------------------------------------------------------
     set_opt: List[str] = typer.Option(
         [], "--set", help="Sobrescritas secao.chave=valor (repetível)."),
     ang_unit: Optional[str] = typer.Option(None, "--ang-unit"),
@@ -284,15 +315,60 @@ def calibrate(
         if select is not None:
             overrides["calibration.selected"] = [
                 s.strip() for s in select.split(",") if s.strip()]
+        if backend is not None:
+            overrides["calibration.backend"] = backend
+        if integrator is not None:
+            overrides["calibration.integrator"] = integrator
+        if workers is not None:
+            overrides["calibration.workers"] = workers
+        if batch_size is not None:
+            overrides["calibration.batch_size"] = batch_size
+        if precision is not None:
+            overrides["calibration.precision"] = precision
+        if substeps is not None:
+            overrides["calibration.substeps"] = substeps
         cfg, theta, P, resumo = _carregar(
             data, config, overrides,
             ang_unit=ang_unit, press_unit=press_unit,
             theta_min=theta_min, theta_max=theta_max)
+        out = _output_dir(output, overwrite)
 
         from .calibration import CalibrationError, run_calibration
-        calibracao = run_calibration(
-            theta, P, cfg["engine"], cfg["wiebe"], cfg["simulation"],
-            cfg["calibration"])
+
+        # Benchmark reproduzível antes da calibração (regra 7 do plano HPC)
+        if benchmark:
+            from .calibration import _full0
+            from .backends.benchmark import print_benchmark, run_benchmark
+            selected = list(cfg["calibration"].selected)
+            full0 = _full0(cfg["engine"], cfg["wiebe"])
+            linhas = run_benchmark(
+                theta, P, cfg["engine"], cfg["wiebe"], cfg["simulation"],
+                cfg["calibration"], selected, full0,
+                csv_path=str(out / "benchmark_hpc.csv"),
+                substeps=cfg["calibration"].substeps)
+            typer.secho("Benchmark dos backends (warm-up + 3 réplicas):",
+                        fg="cyan")
+            typer.echo(print_benchmark(linhas))
+            typer.echo(f"  CSV: {out / 'benchmark_hpc.csv'}")
+
+        if profile:
+            import cProfile
+            profiler = cProfile.Profile()
+
+            profiler.enable()
+            calibracao = run_calibration(
+                theta, P, cfg["engine"], cfg["wiebe"], cfg["simulation"],
+                cfg["calibration"])
+            profiler.disable()
+            stats_path = out / "profile_calibracao.pstats"
+            profiler.dump_stats(str(stats_path))
+            import pstats
+            st = pstats.Stats(str(stats_path))
+            st.sort_stats("cumulative").print_stats(15)
+        else:
+            calibracao = run_calibration(
+                theta, P, cfg["engine"], cfg["wiebe"], cfg["simulation"],
+                cfg["calibration"])
     except typer.Exit:
         raise
     except (CalibrationError, ValueError) as e:
@@ -308,7 +384,6 @@ def calibrate(
         from .simulation import run_simulation
         eng, wieb = apply_calibrated(calibracao, cfg["engine"], cfg["wiebe"])
         res = run_simulation(theta, P, eng, wieb, cfg["simulation"])
-        out = _output_dir(output, overwrite)
         from .reporting import export_all
         arquivos = export_all(res, out, calibracao)
     except ValueError as e:
@@ -320,6 +395,93 @@ def calibrate(
         typer.secho("  arquivos gerados:", fg="bright_black")
         for a in arquivos:
             typer.echo(f"    {a}")
+    raise typer.Exit(EXIT_OK)
+
+
+# =============================================================================
+# double-wiebe devices
+# =============================================================================
+@app.command()
+def devices():
+    """Mostra o hardware detectado (CPU, numba, CUDA, OpenCL)."""
+    from .backends import get_available_backends, hardware_report
+    typer.echo(hardware_report())
+    disponiveis = ", ".join(sorted(get_available_backends()))
+    typer.secho(f"\nBackends disponíveis: {disponiveis}", fg="cyan")
+    raise typer.Exit(EXIT_OK)
+
+
+# =============================================================================
+# double-wiebe benchmark
+# =============================================================================
+@app.command()
+def benchmark(
+    data: Optional[Path] = typer.Option(
+        None, "--data", help="Arquivo experimental (.txt/.csv/.tsv). Sem "
+        "--data usa uma população sintética (tempos relativos)."),
+    config: Optional[Path] = typer.Option(
+        None, "--config", help="Arquivo YAML de configuração."),
+    output: Optional[Path] = typer.Option(
+        None, "--output", "-o", help="CSV de saída (default: sem CSV)."),
+    overwrite: bool = typer.Option(False, "--overwrite"),
+    set_opt: List[str] = typer.Option([], "--set"),
+    tamanhos: str = typer.Option(
+        "1,20,100,1000", "--tamanhos",
+        help="Tamanhos de população, separados por vírgula."),
+    rep: int = typer.Option(3, "--rep", help="Réplicas por medida (>= 2)."),
+    ang_unit: Optional[str] = typer.Option(None, "--ang-unit"),
+    press_unit: Optional[str] = typer.Option(None, "--press-unit"),
+):
+    """Compara os backends (serial, cpu RK4 NumPy/Numba, cpu-parallel) com
+    warm-up, média e desvio — benchmark reproduzível (regra 7 do plano HPC)."""
+    try:
+        from .backends.benchmark import print_benchmark, run_benchmark
+        from .calibration import _full0
+        from .models import DEFAULT_SELECTED
+
+        cfg = None
+        if data is not None:
+            cfg, theta, P, _ = _carregar(
+                data, config, _parse_sets(set_opt), ang_unit=ang_unit,
+                press_unit=press_unit)
+            engine, wiebe, sim, calib = (cfg["engine"], cfg["wiebe"],
+                                         cfg["simulation"],
+                                         cfg["calibration"])
+            selected = list(cfg["calibration"].selected)
+            full0 = _full0(engine, wiebe)
+        else:
+            # sem dados: sintético leve, só para medir tempo relativo
+            import numpy as np
+            from .models import (CalibrationConfig, EngineConfig,
+                                 SimulationConfig, WiebeParameters)
+            theta = np.linspace(-2.0, 2.0, 240)
+            P = np.exp(1.37 * (2.0 - theta)) * 138.2
+            engine, wiebe = EngineConfig(), WiebeParameters()
+            sim, calib = SimulationConfig(), CalibrationConfig()
+            selected = list(DEFAULT_SELECTED)
+            full0 = _full0(engine, wiebe)
+
+        if output is not None:
+            p_out = Path(output)
+            p_out.parent.mkdir(parents=True, exist_ok=True)
+            csv_path = (str(p_out) if p_out.suffix
+                        else str(p_out / "benchmark_hpc.csv"))
+        else:
+            csv_path = None
+        linhas = run_benchmark(
+            theta, P, engine, wiebe, sim, calib, selected, full0,
+            tamanhos=tuple(int(t) for t in tamanhos.split(",") if t.strip()),
+            rep=max(2, rep), csv_path=csv_path,
+            substeps=cfg["calibration"].substeps
+            if cfg is not None else 4)
+        typer.echo(print_benchmark(linhas))
+        if csv_path:
+            typer.secho(f"CSV: {csv_path}", fg="green")
+    except typer.Exit:
+        raise
+    except Exception as e:
+        typer.secho(f"Falha no benchmark: {e}", fg="red", err=True)
+        raise typer.Exit(EXIT_FAIL)
     raise typer.Exit(EXIT_OK)
 
 

@@ -196,14 +196,24 @@ def _make_objective(
 # =============================================================================
 # Buscas
 # =============================================================================
-def _run_pso(objective, lower, upper, calib, progress_callback, cancel_check):
+def _run_pso(objective, lower, upper, calib, progress_callback, cancel_check,
+             eval_batch=None):
     """PSO sem inércia: x += 2r1*(pbest-x) + 2r2*(gbest-x), clamp, parada
-    por estagnação (pso_max_stall repetições com mudança < tol)."""
+    por estagnação (pso_max_stall repetições com mudança < tol).
+
+    ``eval_batch``: quando o backend acelera avaliações em lote, recebe
+    (S, nvar) -> (S,); senão avalia partícula a partícula (serial)."""
     rng = np.random.default_rng(calib.seed)
     li, ls = np.asarray(lower), np.asarray(upper)
     nvar = li.size
+
+    def _eval(X):
+        if eval_batch is not None:
+            return np.asarray(eval_batch(X), dtype=float)
+        return np.array([objective(X[j]) for j in range(X.shape[0])])
+
     X = li + rng.random((calib.pso_particles, nvar)) * (ls - li)
-    fX = np.array([objective(X[j]) for j in range(calib.pso_particles)])
+    fX = _eval(X)
     P_best, f_best = X.copy(), fX.copy()
     jbest = int(np.argmin(f_best))
     fbest = float(f_best[jbest])
@@ -217,7 +227,7 @@ def _run_pso(objective, lower, upper, calib, progress_callback, cancel_check):
         X = X + calib.pso_beta * r1 * (P_best - X) \
             + calib.pso_beta * r2 * (P_best[jbest] - X)
         X = np.clip(X, li, ls)
-        fX = np.array([objective(X[j]) for j in range(calib.pso_particles)])
+        fX = _eval(X)
         improved = fX < f_best
         P_best[improved], f_best[improved] = X[improved], fX[improved]
         jnew = int(np.argmin(f_best))
@@ -243,8 +253,13 @@ def _run_pso(objective, lower, upper, calib, progress_callback, cancel_check):
     }
 
 
-def _run_de(objective, lower, upper, calib, progress_callback, cancel_check):
-    """scipy.optimize.differential_evolution com progresso e cancelamento."""
+def _run_de(objective, lower, upper, calib, progress_callback, cancel_check,
+            eval_batch=None):
+    """scipy.optimize.differential_evolution com progresso e cancelamento.
+
+    Com backend acelerado (``eval_batch``) usa ``vectorized=True``: a
+    população inteira de cada geração é avaliada em lote pelo backend
+    (updating="deferred", exigido pelo scipy nesse modo)."""
     from scipy.optimize import differential_evolution
 
     history: List[float] = []
@@ -273,11 +288,24 @@ def _run_de(objective, lower, upper, calib, progress_callback, cancel_check):
             return True          # solicita parada do DE
         return False
 
-    result = differential_evolution(
-        objective, list(zip(np.asarray(lower), np.asarray(upper))),
-        seed=calib.seed, maxiter=calib.maxiter, popsize=calib.popsize,
-        tol=calib.tol, polish=False, updating="immediate", callback=callback,
-    )
+    if eval_batch is not None:
+        def obj_vec(X):
+            # scipy passa X com forma (n_params, S); avaliamos em lote
+            return np.asarray(eval_batch(np.asarray(X).T), dtype=float)
+
+        result = differential_evolution(
+            obj_vec, list(zip(np.asarray(lower), np.asarray(upper))),
+            seed=calib.seed, maxiter=calib.maxiter, popsize=calib.popsize,
+            tol=calib.tol, polish=False, updating="deferred",
+            vectorized=True, callback=callback,
+        )
+    else:
+        result = differential_evolution(
+            objective, list(zip(np.asarray(lower), np.asarray(upper))),
+            seed=calib.seed, maxiter=calib.maxiter, popsize=calib.popsize,
+            tol=calib.tol, polish=False, updating="immediate",
+            callback=callback,
+        )
     return {
         "x": result.x.copy(), "fun": float(result.fun), "nit": int(result.nit),
         "history": history, "history_params": history_params,
@@ -353,10 +381,26 @@ def _refine_least_squares(
     return result.x.copy()
 
 
-def _sensitivity(objective, x_sel, rmse_best) -> List[Dict]:
-    """Sensibilidade por parâmetro: perturbação ±1% no valor ótimo."""
+def _sensitivity(objective, x_sel, rmse_best, eval_batch=None) -> List[Dict]:
+    """Sensibilidade por parâmetro: perturbação ±1% no valor ótimo.
+    Com ``eval_batch``, avalia os 2n candidatos em lote (backend)."""
     linhas: List[Dict] = []
     limiar = 0.001 * abs(rmse_best) if rmse_best > 0 else 1e-12
+    if eval_batch is not None:
+        deltas = [0.01 * abs(x_sel[i]) if x_sel[i] != 0.0 else 1e-6
+                  for i in range(x_sel.size)]
+        cands = np.array([_perturb(x_sel, i, d * s)
+                          for i, d in enumerate(deltas)
+                          for s in (+1.0, -1.0)])
+        fv = np.asarray(eval_batch(cands), dtype=float)
+        for i in range(x_sel.size):
+            d_rmse = max(abs(fv[2 * i] - rmse_best),
+                         abs(fv[2 * i + 1] - rmse_best))
+            linhas.append({
+                "delta_rmse": float(d_rmse),
+                "insensitive": bool(d_rmse < limiar),
+            })
+        return linhas
     for i in range(x_sel.size):
         delta = 0.01 * abs(x_sel[i]) if x_sel[i] != 0.0 else 1e-6
         f_plus = objective(_perturb(x_sel, i, +delta))
@@ -421,6 +465,29 @@ def run_calibration(
     objective = _make_objective(
         theta_exp, P_exp, engine, wiebe, sim, calib, selected, expand)
 
+    # --- backend de desempenho (plano HPC) ---------------------------------
+    # serial: caminho original (referência). cpu / cpu-parallel / auto:
+    # avaliações de POPULAÇÃO em lote (RK4 vetorizado ou processos); o
+    # melhor candidato final é SEMPRE re-integrado com solve_ivp abaixo.
+    backend = None
+    eval_batch = None
+    import time as _time
+    t_inicio = _time.perf_counter()
+    if calib.backend not in ("serial", None):
+        from .backends import select_backend
+        backend = select_backend(calib.backend, workers=calib.workers,
+                                 integrator=calib.integrator)
+        idx_sel = [PARAM_ORDER.index(n) for n in selected]
+
+        def eval_batch(X_sel: np.ndarray) -> np.ndarray:
+            X_sel = np.atleast_2d(np.asarray(X_sel, dtype=float))
+            X_full = np.tile(full0, (X_sel.shape[0], 1))
+            X_full[:, idx_sel] = X_sel
+            return backend.evaluate_population(
+                X_full, theta_exp, P_exp, engine, wiebe, sim, calib,
+                precision=calib.precision, substeps=calib.substeps,
+                batch_size=calib.batch_size)
+
     # Limites efetivos no vetor completo (sobrescritas por parâmetro)
     lower_full = np.array([PARAM_SPECS[n]["lower"] for n in PARAM_ORDER])
     upper_full = np.array([PARAM_SPECS[n]["upper"] for n in PARAM_ORDER])
@@ -431,10 +498,12 @@ def run_calibration(
 
     if calib.method == "pso":
         resultado = _run_pso(objective, lower, upper, calib,
-                             progress_callback, cancel_check)
+                             progress_callback, cancel_check,
+                             eval_batch=eval_batch)
     elif calib.method == "differential-evolution":
         resultado = _run_de(objective, lower, upper, calib,
-                            progress_callback, cancel_check)
+                            progress_callback, cancel_check,
+                            eval_batch=eval_batch)
     elif calib.method == "least-squares":
         resultado = _run_least_squares(
             theta_exp, P_exp, engine, wiebe, sim, calib, selected,
@@ -445,85 +514,112 @@ def run_calibration(
     x_sel = np.asarray(resultado["x"], dtype=float)
     x_full = expand(x_sel)
 
-    # Refinamento least-squares (opcional, após DE/PSO)
-    polish: Optional[Dict] = None
-    if (calib.polish and calib.method in ("differential-evolution", "pso")
-            and not resultado.get("cancelado")):
-        try:
-            x_ref = _refine_least_squares(
-                theta_exp, P_exp, engine, wiebe, sim, selected,
-                x_full, idx, lower_full, upper_full)
-            f_ref = objective(x_ref)
-            if f_ref < resultado["fun"]:
-                polish = {"rmse": float(f_ref), "aplicado": True}
-                x_sel, x_full = np.asarray(x_ref), expand(x_ref)
-            else:
-                polish = {"rmse": float(f_ref), "aplicado": False}
-        except Exception as e:                    # refinamento é opcional
-            polish = {"erro": str(e), "aplicado": False}
+    # --- validação numérica (regra 4): re-run do melhor candidato com a
+    # referência serial (solve_ivp), SEMPRE ------------------------------
+    rmse_integrador = float(resultado["fun"])
+    rmse_best = float(objective(x_sel))
+    dif_integrador = abs(rmse_best - rmse_integrador)
+    if backend is not None:
+        resultado["fun"] = rmse_best
 
-    rmse_best = float(resultado["fun"])
-    eng_cal, wieb_cal = _params_from_vector(
-        x_full, PARAM_ORDER, engine, wiebe)
+    # --- validação numérica (regra 4): re-run do melhor candidato com a
+    # referência serial (solve_ivp), SEMPRE ------------------------------
+    rmse_integrador = float(resultado["fun"])
+    rmse_best = float(objective(x_sel))
+    if backend is not None:
+        resultado["fun"] = rmse_best
 
-    # Sensibilidade (pula quando cancelado ou penalidade)
-    sensitivity: List[Dict] = []
-    if not resultado.get("cancelado") and rmse_best < PENALTY:
-        linhas = _sensitivity(objective, x_sel, rmse_best)
-        sensitivity = [
-            {"param": nome, **lin} for nome, lin in zip(selected, linhas)
-        ]
+    try:
+        # Refinamento least-squares (opcional, após DE/PSO)
+        polish: Optional[Dict] = None
+        if (calib.polish and calib.method in ("differential-evolution", "pso")
+                and not resultado.get("cancelado")):
+            try:
+                x_ref = _refine_least_squares(
+                    theta_exp, P_exp, engine, wiebe, sim, selected,
+                    x_full, idx, lower_full, upper_full)
+                f_ref = objective(x_ref)
+                if f_ref < resultado["fun"]:
+                    polish = {"rmse": float(f_ref), "aplicado": True}
+                    x_sel, x_full = np.asarray(x_ref), expand(x_ref)
+                else:
+                    polish = {"rmse": float(f_ref), "aplicado": False}
+            except Exception as e:                # refinamento é opcional
+                polish = {"erro": str(e), "aplicado": False}
 
-    # Alertas
-    alertas: List[str] = []
-    for i, nome in enumerate(selected):
-        lo, hi = lower[i], upper[i]
-        span = hi - lo
-        if x_sel[i] <= lo + 1e-6 * span or x_sel[i] >= hi - 1e-6 * span:
+        rmse_best = float(resultado["fun"])
+        dif_integrador = abs(rmse_best - rmse_integrador)
+        eng_cal, wieb_cal = _params_from_vector(
+            x_full, PARAM_ORDER, engine, wiebe)
+
+        # Sensibilidade (pula quando cancelado ou penalidade)
+        sensitivity: List[Dict] = []
+        if not resultado.get("cancelado") and rmse_best < PENALTY:
+            linhas = _sensitivity(objective, x_sel, rmse_best,
+                                  eval_batch=eval_batch)
+            sensitivity = [
+                {"param": nome, **lin} for nome, lin in zip(selected, linhas)
+            ]
+
+        # Alertas
+        alertas: List[str] = []
+        for i, nome in enumerate(selected):
+            lo, hi = lower[i], upper[i]
+            span = hi - lo
+            if x_sel[i] <= lo + 1e-6 * span or x_sel[i] >= hi - 1e-6 * span:
+                alertas.append(
+                    f"⚠ {nome} calibrado na borda do domínio ({x_sel[i]:.4g}); "
+                    f"limites ({lo:.4g}, {hi:.4g}) — ótimo possivelmente mal "
+                    "condicionado.")
+        insens = [s["param"] for s in sensitivity if s.get("insensitive")]
+        if insens:
             alertas.append(
-                f"⚠ {nome} calibrado na borda do domínio ({x_sel[i]:.4g}); "
-                f"limites ({lo:.4g}, {hi:.4g}) — ótimo possivelmente mal "
-                "condicionado.")
-    insens = [s["param"] for s in sensitivity if s.get("insensitive")]
-    if insens:
-        alertas.append(
-            "⚠ Identificabilidade: parâmetro(s) " + ", ".join(insens) +
-            " com sensibilidade desprezível — combinações diferentes "
-            "produzem erros praticamente equivalentes. Considere fixar "
-            "estes parâmetros ou usar mais dados.")
-    if rmse_best >= PENALTY:
-        alertas.append("⚠ Calibração terminou em penalidade (nenhuma "
-                       "combinação testada produziu integração válida).")
-    if calib.w_order > 0 and wieb_cal.theta02 < wieb_cal.theta01:
-        alertas.append("⚠ theta02 < theta01 no resultado (restrição "
-                       "violada mesmo com regularização).")
+                "⚠ Identificabilidade: parâmetro(s) " + ", ".join(insens) +
+                " com sensibilidade desprezível — combinações diferentes "
+                "produzem erros praticamente equivalentes. Considere fixar "
+                "estes parâmetros ou usar mais dados.")
+        if rmse_best >= PENALTY:
+            alertas.append("⚠ Calibração terminou em penalidade (nenhuma "
+                           "combinação testada produziu integração válida).")
+        if calib.w_order > 0 and wieb_cal.theta02 < wieb_cal.theta01:
+            alertas.append("⚠ theta02 < theta01 no resultado (restrição "
+                           "violada mesmo com regularização).")
 
-    return {
-        "params": dict(zip(PARAM_ORDER, map(float, x_full))),
-        "params_initial": dict(zip(PARAM_ORDER, map(float, full0))),
-        "selected": selected,
-        "lower": dict(zip(selected, map(float, lower))),
-        "upper": dict(zip(selected, map(float, upper))),
-        "rmse": rmse_best,
-        "objective_history": list(resultado["history"]),
-        "history_params": [np.asarray(h).copy()
-                           for h in resultado["history_params"]],
-        "method": calib.method,
-        "seed": calib.seed,
-        "iteracoes": int(resultado["nit"]),
-        "message": str(resultado["message"]),
-        "success": bool(resultado["success"]),
-        "cancelado": bool(resultado.get("cancelado", False)),
-        "parou_por_estagnacao": bool(
-            resultado.get("parou_por_repeticao", False)),
-        "polish": polish,
-        "sensitivity": sensitivity,
-        "alerts": alertas,
-        "engine": dict(vars(eng_cal)),
-        "wiebe": dict(vars(wieb_cal)),
-        "theta_exp": theta_exp,
-        "P_exp": P_exp,
-    }
+        tempo_s = _time.perf_counter() - t_inicio
+        return {
+            "params": dict(zip(PARAM_ORDER, map(float, x_full))),
+            "params_initial": dict(zip(PARAM_ORDER, map(float, full0))),
+            "selected": selected,
+            "lower": dict(zip(selected, map(float, lower))),
+            "upper": dict(zip(selected, map(float, upper))),
+            "rmse": rmse_best,
+            "objective_history": list(resultado["history"]),
+            "history_params": [np.asarray(h).copy()
+                               for h in resultado["history_params"]],
+            "method": calib.method,
+            "seed": calib.seed,
+            "iteracoes": int(resultado["nit"]),
+            "message": str(resultado["message"]),
+            "success": bool(resultado["success"]),
+            "cancelado": bool(resultado.get("cancelado", False)),
+            "parou_por_estagnacao": bool(
+                resultado.get("parou_por_repeticao", False)),
+            "polish": polish,
+            "sensitivity": sensitivity,
+            "alerts": alertas,
+            "engine": dict(vars(eng_cal)),
+            "wiebe": dict(vars(wieb_cal)),
+            "theta_exp": theta_exp,
+            "P_exp": P_exp,
+            # --- HPC (plano de aceleração) ---
+            "backend": calib.backend or "serial",
+            "rmse_integrador": rmse_integrador,
+            "diferenca_integrador": dif_integrador,
+            "tempo_s": tempo_s,
+        }
+    finally:
+        if backend is not None:
+            backend.close()
 
 
 def apply_calibrated(

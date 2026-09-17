@@ -246,8 +246,18 @@ class CalibrationConfig:
     w_min_duration: float = 1.0e4  # durações excessivamente pequenas
     delta_min_deg: float = 5.0     # duração mínima física [graus]
     w_ridge: float = 0.0           # regularização ridge (afastar dos limites)
+    # Desempenho (plano HPC)
+    backend: str = "serial"        # serial | cpu | cpu-parallel | auto
+    integrator: str = "auto"       # auto | scipy | rk4_numpy | rk4_numba
+    workers: Optional[int] = None  # processos (cpu-parallel); None = auto
+    batch_size: int = 0            # candidatos por lote (0 = tudo de uma vez)
+    precision: str = "float64"     # float64 | float32 (só no modo acelerado)
+    substeps: int = 4              # sub-passos do RK4 em lote (modo acelerado)
 
     METHODS = ("differential-evolution", "pso", "least-squares")
+    BACKENDS = ("serial", "cpu", "cpu-parallel", "auto")
+    PRECISIONS = ("float64", "float32")
+    INTEGRATORS = ("auto", "scipy", "rk4_numpy", "rk4_numba")
 
     def validate(self) -> List[str]:
         erros: List[str] = []
@@ -261,6 +271,19 @@ class CalibrationConfig:
         if any(w < 0.0 for w in (self.w_order, self.w_overlap,
                                  self.w_min_duration, self.w_ridge)):
             erros.append("pesos de regularização devem ser >= 0.")
+        if self.backend not in self.BACKENDS:
+            erros.append(f"backend deve ser um de {self.BACKENDS} "
+                         f"(recebido '{self.backend}').")
+        if self.integrator not in self.INTEGRATORS:
+            erros.append(f"integrator deve ser um de {self.INTEGRATORS} "
+                         f"(recebido '{self.integrator}').")
+        if self.precision not in self.PRECISIONS:
+            erros.append(f"precision deve ser uma de {self.PRECISIONS} "
+                         f"(recebido '{self.precision}').")
+        if self.workers is not None and self.workers < 1:
+            erros.append("workers deve ser >= 1 (ou None para automático).")
+        if self.substeps < 1:
+            erros.append("substeps deve ser >= 1.")
         return erros
 
 
@@ -324,6 +347,14 @@ def _config_to_dict(engine: EngineConfig, wiebe: WiebeParameters,
                 "delta_min_deg": calibration.delta_min_deg,
                 "w_ridge": calibration.w_ridge,
             },
+            # desempenho (plano HPC) — chaves planas para os overrides
+            # da CLI (--set calibration.backend=cpu)
+            "backend": calibration.backend,
+            "integrator": calibration.integrator,
+            "workers": calibration.workers,
+            "batch_size": calibration.batch_size,
+            "precision": calibration.precision,
+            "substeps": calibration.substeps,
         },
     }
 
@@ -444,6 +475,13 @@ def load_config(
         w_min_duration=float(reg.get("w_min_duration", 1.0e4)),
         delta_min_deg=float(reg.get("delta_min_deg", 5.0)),
         w_ridge=float(reg.get("w_ridge", 0.0)),
+        backend=str(cal.get("backend", "serial") or "serial"),
+        integrator=str(cal.get("integrator", "auto") or "auto"),
+        workers=(int(cal["workers"])
+                 if cal.get("workers") is not None else None),
+        batch_size=int(cal.get("batch_size", 0)),
+        precision=str(cal.get("precision", "float64") or "float64"),
+        substeps=int(cal.get("substeps", 4)),
     )
     return {
         "engine": engine,
