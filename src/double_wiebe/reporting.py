@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import base64
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -133,6 +134,142 @@ def metrics_json_path(res, outdir: str | Path,
     path = out / "metrics.json"
     path.write_bytes(metrics_json_bytes(res, calibration))
     return path
+
+
+# =============================================================================
+# Arquivo de calibração (salvar / abrir)
+# =============================================================================
+_CALIB_FORMATO = "double-wiebe-calibracao"
+_CALIB_VERSAO = 1
+
+# Chaves do calib_result serializadas em seções próprias do arquivo
+_CALIB_CHAVES_SECAO = ("theta_exp", "P_exp", "engine", "wiebe",
+                       "history_params", "objective_history")
+
+
+def _json_safe(obj):
+    """Converte tipos NumPy/containers para tipos JSON nativos (recursivo)."""
+    if isinstance(obj, dict):
+        return {str(k): _json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_json_safe(v) for v in obj]
+    if isinstance(obj, np.ndarray):
+        return [_json_safe(v) for v in obj.tolist()]
+    if isinstance(obj, (bool, np.bool_)):
+        return bool(obj)
+    if isinstance(obj, (int, np.integer)):
+        return int(obj)
+    if isinstance(obj, (float, np.floating)):
+        return float(obj)
+    return obj if obj is None or isinstance(obj, str) else str(obj)
+
+
+def calibration_json_bytes(calibracao: Dict, data_name: str = "") -> bytes:
+    """Serializa o resultado da calibração num JSON reaberto por
+    `read_calibration_json`.
+
+    O arquivo embute: os dados experimentais usados (θ em rad, P em kPa), as
+    configurações de motor e Wiebe da busca e o resultado completo (parâmetros,
+    histórico, sensibilidade, alertas, HPC). Ângulos em radianos — unidade
+    interna do pacote.
+    """
+    doc = {
+        "analise": {
+            "titulo": "Double Wiebe Combustion Analysis — Calibração",
+            "formato": _CALIB_FORMATO,
+            "versao": _CALIB_VERSAO,
+            "data_hora": datetime.now().isoformat(timespec="seconds"),
+            "arquivo_experimental": data_name,
+        },
+        "dados": {
+            "theta_rad": _json_safe(calibracao.get("theta_exp")),
+            "pressao_kPa": _json_safe(calibracao.get("P_exp")),
+        },
+        "motor": _json_safe(calibracao.get("engine") or {}),
+        "wiebe": _json_safe(calibracao.get("wiebe") or {}),
+        "calibracao": _json_safe({k: calibracao[k] for k in calibracao
+                                  if k not in _CALIB_CHAVES_SECAO}),
+        "historico": {
+            "rmse_kPa": _json_safe(calibracao.get("objective_history")),
+            "parametros": _json_safe(calibracao.get("history_params")),
+        },
+    }
+    return json.dumps(doc, indent=2, ensure_ascii=False).encode("utf-8")
+
+
+def read_calibration_json(arquivo) -> Dict:
+    """Lê um arquivo salvo por `calibration_json_bytes` e devolve um
+    dicionário com: 'calibracao' (o calib_result reconstruído no formato
+    consumido pela CLI/GUI), 'theta'/'pressao' (np.ndarray ou None — só
+    restaura o par completo), 'motor', 'wiebe' e 'arquivo_experimental'.
+    Lança ValueError em arquivo inválido.
+    """
+    try:
+        texto = arquivo.read() if hasattr(arquivo, "read") else str(arquivo)
+        if isinstance(texto, bytes):
+            texto = texto.decode("utf-8")
+        doc = json.loads(texto)
+    except (AttributeError, UnicodeDecodeError, json.JSONDecodeError) as e:
+        raise ValueError(f"não é um JSON válido ({e}).") from e
+    if (not isinstance(doc, dict)
+            or (doc.get("analise") or {}).get("formato") != _CALIB_FORMATO):
+        raise ValueError('esperado um arquivo salvo pela GUI '
+                         f'("formato": "{_CALIB_FORMATO}").')
+    c = doc.get("calibracao") or {}
+    if "params" not in c or "rmse" not in c:
+        raise ValueError('seção "calibracao" incompleta '
+                         "(params/rmse ausentes).")
+    params = {k: float(v) for k, v in c["params"].items()}
+    if not all(np.isfinite(v) for v in params.values()):
+        raise ValueError("parâmetros não finitos no arquivo.")
+
+    hist = doc.get("historico") or {}
+    calib = {
+        "params": params,
+        "params_initial": {k: float(v) for k, v in
+                           (c.get("params_initial") or params).items()},
+        "selected": list(c.get("selected") or []),
+        "rmse": float(c["rmse"]),
+        "objective_history": [float(h) for h in (hist.get("rmse_kPa") or [])],
+        "history_params": [np.asarray(p, dtype=float)
+                           for p in (hist.get("parametros") or [])],
+        "method": str(c.get("method", "?")),
+        "seed": c.get("seed"),
+        "iteracoes": int(c.get("iteracoes", 0)),
+        "message": str(c.get("message", "")),
+        "success": bool(c.get("success", True)),
+        "cancelado": False,
+        "parou_por_estagnacao": bool(c.get("parou_por_estagnacao", False)),
+        "polish": c.get("polish"),
+        "sensitivity": list(c.get("sensitivity") or []),
+        "alerts": list(c.get("alerts") or []),
+        "engine": {k: v for k, v in (doc.get("motor") or {}).items()},
+        "wiebe": {k: v for k, v in (doc.get("wiebe") or {}).items()},
+        "theta_exp": None,
+        "P_exp": None,
+        "backend": str(c.get("backend", "serial")),
+    }
+    for chave in ("rmse_integrador", "diferenca_integrador", "tempo_s"):
+        if c.get(chave) is not None:
+            calib[chave] = float(c[chave])
+
+    dados = doc.get("dados") or {}
+    theta = (np.asarray(dados["theta_rad"], dtype=float)
+             if dados.get("theta_rad") else None)
+    pressao = (np.asarray(dados["pressao_kPa"], dtype=float)
+               if dados.get("pressao_kPa") else None)
+    if theta is None or pressao is None or theta.size != pressao.size:
+        theta = pressao = None
+
+    return {
+        "calibracao": calib,
+        "theta": theta,
+        "pressao": pressao,
+        "motor": dict(doc.get("motor") or {}),
+        "wiebe": dict(doc.get("wiebe") or {}),
+        "arquivo_experimental": str((doc.get("analise") or {})
+                                    .get("arquivo_experimental") or ""),
+    }
 
 
 # =============================================================================

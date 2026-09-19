@@ -189,13 +189,19 @@ def fig_volume(res, ang_deg: bool = False):
 
 
 def fig_pv(res, p_unit: str = "kPa"):
-    """Diagrama P–V (log x opcionalmente linear em V)."""
+    """Diagrama P–V: modelo (linha) + pontos experimentais ('+' vermelho)."""
     import plotly.graph_objects as go
 
     fator = 1.0 if p_unit == "kPa" else 0.01
     fig = go.Figure(go.Scattergl(
         x=res.volume, y=res.P_sim * fator, mode="lines",
-        line=dict(color=C_SIM, width=1.6), name="P–V"))
+        line=dict(color=C_SIM, width=1.6), name="Modelo (P–V)"))
+    # experimental: mesmos ângulos de t_eval → mesmo vetor de volume
+    fig.add_trace(go.Scattergl(
+        x=res.volume, y=res.P_exp * fator, mode="markers",
+        marker=dict(symbol="cross-thin", size=6, color=C_EXP,
+                    line=dict(width=1.4, color=C_EXP)),
+        name="Experimental"))
     fig.update_layout(
         template=TEMPLATE,
         xaxis_title="Volume [m³]",

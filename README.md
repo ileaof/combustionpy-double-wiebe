@@ -15,10 +15,49 @@ Extensão do projeto Single Wiebe: <https://github.com/ileaof/combustionpy-singl
 
 ## 1. Instalação
 
-Requisitos: **Python 3.11+** e pip.
+Requisitos: **Python 3.11+**, pip e **Git**.
+
+### 1.1 Clonar o repositório
 
 ```bash
-cd double_wiebe
+git clone https://github.com/ileaof/combustionpy-double-wiebe.git
+cd combustionpy-double-wiebe
+```
+
+Sem Git: no GitHub, use *Code → Download ZIP*, extraia o arquivo e entre na
+pasta extraída.
+
+### 1.2 Criar e ativar o ambiente virtual (`.venv`) — antes de instalar
+
+O ambiente virtual isola as dependências do projeto do Python do sistema.
+Crie-o **uma única vez**, na raiz do repositório clonado:
+
+```powershell
+# Windows (PowerShell ou cmd)
+python -m venv .venv
+.venv\Scripts\activate
+```
+
+```bash
+# Linux / macOS
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+Com o ambiente ativo, o prompt passa a exibir `(.venv)`. Ative-o sempre que
+abrir um terminal novo (só o comando `activate`, sem recriar); para sair,
+use `deactivate`. A pasta `.venv/` já está no `.gitignore`.
+
+> **Windows:** se o PowerShell recusar a ativação com *"a execução de scripts
+> foi desabilitada neste sistema"*, rode uma vez
+> `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` e ative de novo.
+
+### 1.3 Instalar o pacote
+
+Com o `.venv` ativo:
+
+```bash
+python -m pip install --upgrade pip
 pip install -e .            # instala o pacote + o comando `double-wiebe`
 # alternativa:
 pip install -r requirements.txt

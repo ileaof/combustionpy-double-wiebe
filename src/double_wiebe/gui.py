@@ -35,9 +35,11 @@ from double_wiebe.models import (PARAM_ORDER, CalibrationConfig, EngineConfig,
 from double_wiebe.plotting import (fig_burned, fig_convergence, fig_heat_loss,
                        fig_heat_release, fig_pressure, fig_pv, fig_residual,
                        fig_temperature, fig_volume)
-from double_wiebe.reporting import (convergence_csv_bytes, metrics_json_bytes,
-                        parameters_yaml_bytes, report_html_bytes,
-                        results_csv_bytes, results_dataframe)
+from double_wiebe.reporting import (calibration_json_bytes,
+                                    convergence_csv_bytes, metrics_json_bytes,
+                                    parameters_yaml_bytes,
+                                    read_calibration_json, report_html_bytes,
+                                    results_csv_bytes, results_dataframe)
 from double_wiebe.simulation import run_simulation
 from double_wiebe.wiebe import double_burned_fraction
 
@@ -66,6 +68,7 @@ def _init_state() -> None:
     ss.setdefault("calib_running", False)
     ss.setdefault("calib_progress", None)  # dict compartilhado com a thread
     ss.setdefault("calib_thread", None)
+    ss.setdefault("calib_open_name", None)  # (nome, tamanho) do último aberto
     ss.setdefault("ang_deg", False)
     ss.setdefault("p_unit", "kPa")
     ss.setdefault("results_rerun_after_calib", False)
@@ -717,6 +720,50 @@ with TAB_CALIB:
                            "veja a aba Results.")
             except Exception as e:                   # noqa: BLE001
                 st.error(f"Falha: {e}")
+
+        st.markdown("#### Salvar / abrir calibração")
+        sv, ab = st.columns(2)
+        with sv:
+            st.download_button(
+                "⬇ Salvar calibração (JSON)",
+                data=calibration_json_bytes(
+                    cal, st.session_state.data_name or ""),
+                file_name="calibracao_double_wiebe.json",
+                mime="application/json",
+                help="Salva parâmetros, histórico, sensibilidade, alertas e "
+                     "os dados experimentais usados — reaberto nesta aba.")
+        with ab:
+            up_cal = st.file_uploader("Abrir arquivo de calibração (.json)",
+                                      type=["json"], key="up_calib")
+        if up_cal is not None:
+            try:
+                aberto = read_calibration_json(up_cal)
+            except ValueError as e:
+                st.error(f"Arquivo de calibração inválido: {e}")
+            else:
+                marca = (up_cal.name, up_cal.size)
+                if st.session_state.calib_open_name != marca:
+                    st.session_state.calib_result = aberto["calibracao"]
+                    st.session_state.calib_open_name = marca
+                    if aberto["theta"] is not None and not _tem_dados():
+                        th_ab, P_ab = aberto["theta"], aberto["pressao"]
+                        st.session_state.data_theta = th_ab
+                        st.session_state.data_press = P_ab
+                        st.session_state.data_name = (
+                            aberto["arquivo_experimental"] or up_cal.name)
+                        st.session_state.data_summary = {
+                            "n_obs": int(th_ab.size),
+                            "n_descartadas": 0,
+                            "n_fora_intervalo": 0,
+                            "P1": float(P_ab[0]),
+                        }
+                    st.rerun()
+                st.success(f"Calibração aberta: RMSE = "
+                           f"{aberto['calibracao']['rmse']:.6g} kPa.")
+                if aberto.get("motor"):
+                    st.caption("Motor salvo no arquivo: "
+                               + "; ".join(f"{k}={v}" for k, v in
+                                           sorted(aberto["motor"].items())))
 
 # =============================================================================
 # 6. Results
