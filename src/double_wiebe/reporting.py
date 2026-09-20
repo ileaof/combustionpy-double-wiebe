@@ -12,6 +12,7 @@ funções sobre um :class:`~double_wiebe.simulation.SimulationResult`):
     pressure_comparison.png / .pdf
     heat_release.png
     burned_fraction.png
+    pv_diagram.png            diagrama P–V (numérico × experimental)
     report.html               relatório autocontido (imagens embutidas)
 """
 from __future__ import annotations
@@ -306,15 +307,17 @@ def static_plots(res, outdir: str | Path) -> Dict[str, Path]:
     from matplotlib.backends.backend_pdf import PdfPages
 
     from .plotting import (static_burned_fraction, static_heat_release,
-                           static_pressure_comparison, _plt)
+                           static_pressure_comparison, static_pv_diagram,
+                           _plt)
 
     out = Path(outdir)
     out.mkdir(parents=True, exist_ok=True)
     png_pressure = static_pressure_comparison(res, str(out / "pressure_comparison.png"))
     png_heat = static_heat_release(res, str(out / "heat_release.png"))
     png_burned = static_burned_fraction(res, str(out / "burned_fraction.png"))
+    png_pv = static_pv_diagram(res, str(out / "pv_diagram.png"))
 
-    # PDF com as três figuras (redesenho direto no PdfPages)
+    # PDF com as quatro figuras (redesenho direto no PdfPages)
     pdf_path = out / "pressure_comparison.pdf"
     plt = _plt()
     figs = []
@@ -341,6 +344,13 @@ def static_plots(res, outdir: str | Path) -> Dict[str, Path]:
     ax.set_ylabel("Fração queimada [-]")
     ax.legend()
     figs.append(fig)
+    fig, ax = plt.subplots(figsize=(7, 5.5))
+    ax.plot(res.volume, res.P_sim, "g-", lw=1.5, label="Modelo (Double Wiebe)")
+    ax.plot(res.volume, res.P_exp, "r+", ms=4, label="Experimental")
+    ax.set_xlabel("Volume do cilindro [m³]")
+    ax.set_ylabel("Pressão no cilindro [kPa]")
+    ax.legend()
+    figs.append(fig)
     with PdfPages(str(pdf_path)) as pdf:
         for fig in figs:
             pdf.savefig(fig, bbox_inches="tight")
@@ -350,6 +360,7 @@ def static_plots(res, outdir: str | Path) -> Dict[str, Path]:
         "pressure_comparison.pdf": str(pdf_path),
         "heat_release.png": png_heat,
         "burned_fraction.png": png_burned,
+        "pv_diagram.png": png_pv,
     }
 
 
@@ -484,7 +495,7 @@ def export_all(
     # PNGs em bytes para embutir no relatório
     pngs: Dict[str, bytes] = {}
     for nome in ("pressure_comparison.png", "heat_release.png",
-                 "burned_fraction.png"):
+                 "burned_fraction.png", "pv_diagram.png"):
         pngs[nome] = (out / nome).read_bytes()
     arquivos.append(str(report_html_path(res, out, calibration, pngs)))
     return arquivos

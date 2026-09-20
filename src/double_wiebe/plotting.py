@@ -279,6 +279,23 @@ def static_heat_release(res, path: str) -> str:
     return path
 
 
+def static_pv_diagram(res, path: str) -> str:
+    """pv_diagram.png — diagrama P–V: modelo (linha) + experimental
+    ('+' vermelho), mesma família de estilo das demais figuras estáticas."""
+    plt = _plt()
+    fig, ax = plt.subplots(figsize=(7, 5.5))
+    ax.plot(res.volume, res.P_sim, "g-", lw=1.5, label="Modelo (Double Wiebe)")
+    ax.plot(res.volume, res.P_exp, "r+", ms=4, label="Experimental")
+    ax.set_xlabel("Volume do cilindro [m³]")
+    ax.set_ylabel("Pressão no cilindro [kPa]")
+    ax.set_title("Diagrama P–V (numérico × experimental)")
+    ax.grid(True, alpha=0.4)
+    ax.legend()
+    fig.savefig(path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    return path
+
+
 def static_burned_fraction(res, path: str) -> str:
     """burned_fraction.png — frações das fases e total."""
     plt = _plt()

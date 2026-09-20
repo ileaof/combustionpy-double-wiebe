@@ -650,6 +650,42 @@ with TAB_CALIB:
                 st.session_state.calib_thread.start()
                 st.rerun()
 
+    # Carregar calibração salva — não exige rodar uma calibração antes
+    up_cal = st.file_uploader(
+        "📂 Carregar calibração (.json)", type=["json"], key="up_calib",
+        help="Abre um JSON salvo por “⬇ Salvar calibração” e restaura os "
+             "parâmetros calibrados sem recalibrar; os dados experimentais "
+             "só são restaurados se a sessão estiver vazia.")
+    if up_cal is not None:
+        try:
+            aberto = read_calibration_json(up_cal)
+        except ValueError as e:
+            st.error(f"Arquivo de calibração inválido: {e}")
+        else:
+            marca = (up_cal.name, up_cal.size)
+            if st.session_state.calib_open_name != marca:
+                st.session_state.calib_result = aberto["calibracao"]
+                st.session_state.calib_open_name = marca
+                if aberto["theta"] is not None and not _tem_dados():
+                    th_ab, P_ab = aberto["theta"], aberto["pressao"]
+                    st.session_state.data_theta = th_ab
+                    st.session_state.data_press = P_ab
+                    st.session_state.data_name = (
+                        aberto["arquivo_experimental"] or up_cal.name)
+                    st.session_state.data_summary = {
+                        "n_obs": int(th_ab.size),
+                        "n_descartadas": 0,
+                        "n_fora_intervalo": 0,
+                        "P1": float(P_ab[0]),
+                    }
+                st.rerun()
+            st.success(f"Calibração aberta: RMSE = "
+                       f"{aberto['calibracao']['rmse']:.6g} kPa.")
+            if aberto.get("motor"):
+                st.caption("Motor salvo no arquivo: "
+                           + "; ".join(f"{k}={v}" for k, v in
+                                       sorted(aberto["motor"].items())))
+
     # ------------------------------------------------------------------
     # Progresso/resultado da calibração (thread separada)
     # ------------------------------------------------------------------
@@ -721,49 +757,16 @@ with TAB_CALIB:
             except Exception as e:                   # noqa: BLE001
                 st.error(f"Falha: {e}")
 
-        st.markdown("#### Salvar / abrir calibração")
-        sv, ab = st.columns(2)
-        with sv:
-            st.download_button(
-                "⬇ Salvar calibração (JSON)",
-                data=calibration_json_bytes(
-                    cal, st.session_state.data_name or ""),
-                file_name="calibracao_double_wiebe.json",
-                mime="application/json",
-                help="Salva parâmetros, histórico, sensibilidade, alertas e "
-                     "os dados experimentais usados — reaberto nesta aba.")
-        with ab:
-            up_cal = st.file_uploader("Abrir arquivo de calibração (.json)",
-                                      type=["json"], key="up_calib")
-        if up_cal is not None:
-            try:
-                aberto = read_calibration_json(up_cal)
-            except ValueError as e:
-                st.error(f"Arquivo de calibração inválido: {e}")
-            else:
-                marca = (up_cal.name, up_cal.size)
-                if st.session_state.calib_open_name != marca:
-                    st.session_state.calib_result = aberto["calibracao"]
-                    st.session_state.calib_open_name = marca
-                    if aberto["theta"] is not None and not _tem_dados():
-                        th_ab, P_ab = aberto["theta"], aberto["pressao"]
-                        st.session_state.data_theta = th_ab
-                        st.session_state.data_press = P_ab
-                        st.session_state.data_name = (
-                            aberto["arquivo_experimental"] or up_cal.name)
-                        st.session_state.data_summary = {
-                            "n_obs": int(th_ab.size),
-                            "n_descartadas": 0,
-                            "n_fora_intervalo": 0,
-                            "P1": float(P_ab[0]),
-                        }
-                    st.rerun()
-                st.success(f"Calibração aberta: RMSE = "
-                           f"{aberto['calibracao']['rmse']:.6g} kPa.")
-                if aberto.get("motor"):
-                    st.caption("Motor salvo no arquivo: "
-                               + "; ".join(f"{k}={v}" for k, v in
-                                           sorted(aberto["motor"].items())))
+        st.markdown("#### Salvar calibração")
+        st.download_button(
+            "⬇ Salvar calibração (JSON)",
+            data=calibration_json_bytes(
+                cal, st.session_state.data_name or ""),
+            file_name="calibracao_double_wiebe.json",
+            mime="application/json",
+            help="Salva parâmetros, histórico, sensibilidade, alertas e "
+                 "os dados experimentais usados — reabra no botão "
+                 "“📂 Carregar calibração”, junto ao Start calibration.")
 
 # =============================================================================
 # 6. Results
@@ -857,7 +860,8 @@ with TAB_EXPORT:
         with e2:
             from double_wiebe.plotting import (static_burned_fraction,
                                    static_heat_release,
-                                   static_pressure_comparison)
+                                   static_pressure_comparison,
+                                   static_pv_diagram)
             if st.button("Gerar gráficos estáticos (PNG)",
                          key="btn_static"):
                 buf = io.BytesIO()
@@ -872,13 +876,17 @@ with TAB_EXPORT:
                 static_burned_fraction(r, buf)
                 buf.seek(0)
                 pngs["burned_fraction.png"] = buf.getvalue()
+                buf = io.BytesIO()
+                static_pv_diagram(r, buf)
+                buf.seek(0)
+                pngs["pv_diagram.png"] = buf.getvalue()
                 st.session_state.static_pngs = pngs
             if st.session_state.get("static_pngs"):
                 for nome, dados in st.session_state.static_pngs.items():
                     st.download_button(nome, data=dados, file_name=nome,
                                        mime="image/png",
                                        key=f"dl_{nome}")
-            if st.button("PDF (3 figuras)", key="btn_pdf"):
+            if st.button("PDF (4 figuras)", key="btn_pdf"):
                 from matplotlib.backends.backend_pdf import PdfPages
                 pdf_buf = io.BytesIO()
                 with PdfPages(pdf_buf) as pdf:
@@ -917,6 +925,16 @@ with TAB_EXPORT:
                     ax.legend()
                     pdf.savefig(fig, bbox_inches="tight")
                     plt.close(fig)
+                    fig, ax = plt.subplots(figsize=(7, 5.5))
+                    ax.plot(r.volume, r.P_sim, "g-", lw=1.5,
+                            label="Modelo (Double Wiebe)")
+                    ax.plot(r.volume, r.P_exp, "r+", ms=4,
+                            label="Experimental")
+                    ax.set_xlabel("Volume do cilindro [m³]")
+                    ax.set_ylabel("Pressão no cilindro [kPa]")
+                    ax.legend()
+                    pdf.savefig(fig, bbox_inches="tight")
+                    plt.close(fig)
                 pdf_buf.seek(0)
                 st.session_state.pdf_bytes = pdf_buf.getvalue()
             if st.session_state.get("pdf_bytes"):
@@ -925,9 +943,25 @@ with TAB_EXPORT:
                                    file_name="pressure_comparison.pdf",
                                    mime="application/pdf", key="dl_pdf")
             if st.button("Relatório HTML (autocontido)", key="btn_html"):
-                pngs = st.session_state.get("static_pngs", {})
+                # Figuras geradas na hora — o relatório NÃO depende de
+                # "Gerar gráficos estáticos (PNG)" ter sido clicado antes.
+                from double_wiebe.plotting import (static_burned_fraction,
+                                                   static_heat_release,
+                                                   static_pressure_comparison,
+                                                   static_pv_diagram)
+                pngs = {}
+                for nome, fn in (
+                        ("pressure_comparison.png",
+                         static_pressure_comparison),
+                        ("heat_release.png", static_heat_release),
+                        ("burned_fraction.png", static_burned_fraction),
+                        ("pv_diagram.png", static_pv_diagram)):
+                    buf = io.BytesIO()
+                    fn(r, buf)
+                    buf.seek(0)
+                    pngs[nome] = buf.getvalue()
                 st.session_state.html_bytes = report_html_bytes(
-                    r, cal_atual, figures_png=pngs or None)
+                    r, cal_atual, figures_png=pngs)
             if st.session_state.get("html_bytes"):
                 st.download_button("report.html",
                                    data=st.session_state.html_bytes,

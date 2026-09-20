@@ -250,8 +250,8 @@ Rc 17 · m_comb = 9,42754647351e−6 kg/ciclo · PCI 39.191,3 kJ/kg ·
 
 `results.csv` (14 colunas), `parameters.yaml`, `metrics.json`,
 `convergence.csv` (quando há calibração), `pressure_comparison.png`/`.pdf`,
-`heat_release.png`, `burned_fraction.png`, `report.html` (autocontido,
-imagens embutidas).
+`heat_release.png`, `burned_fraction.png`, `pv_diagram.png` (P–V
+numérico × experimental), `report.html` (autocontido, imagens embutidas).
 
 ## 7. Testes
 

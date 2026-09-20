@@ -62,7 +62,8 @@ def test_simulate_exit_0_e_exportacoes(simulacao_basica):
     assert r.exit_code == 0
     esperados = ["results.csv", "parameters.yaml", "metrics.json",
                  "pressure_comparison.png", "pressure_comparison.pdf",
-                 "heat_release.png", "burned_fraction.png", "report.html"]
+                 "heat_release.png", "burned_fraction.png",
+                 "pv_diagram.png", "report.html"]
     for nome in esperados:
         assert (out / nome).exists(), f"faltou {nome}"
 
