@@ -142,14 +142,13 @@ pip install -e .                    <em># instala o pacote + o comando `double-w
   <p>Extras opcionais:</p>
 <pre><code>pip install -e ".[cpu]"     <em># numba: RK4 em lote compilado (backend cpu)</em>
 pip install -e ".[dev]"     <em># pytest</em>
-pip install -e ".[cuda]"    <em># cupy: APENAS detecção de GPU em `devices`/GUI</em>
+pip install -e ".[cuda]"    <em># cupy: backend cuda (RK4 em lote na GPU NVIDIA)</em>
 pip install -e ".[opencl]"  <em># pyopencl: APENAS detecção de dispositivos</em></code></pre>
 
-  <div class="box warn"><b>Nota:</b> os extras <code>[cuda]</code> e
-  <code>[opencl]</code> <u>não</u> aceleram a calibração — CUDA/OpenCL não são
-  backends de execução deste pacote (justificativa em <code>docs/hpc.md</code>).
-  O caminho de aceleração real é o backend <code>cpu</code> (numba),
-  <a href="#hpc">§ 8</a>.</div>
+  <div class="box warn"><b>Nota:</b> o extra <code>[cuda]</code> habilita o
+  backend <code>cuda</code> (GPU NVIDIA, via CuPy). O extra <code>[opencl]</code>
+  serve apenas à detecção de dispositivos. Sem GPU, o melhor acelerador é o
+  backend <code>cpu</code> (numba), <a href="#hpc">§ 8</a>.</div>
 
   <h3>Verificar a instalação</h3>
 <pre><code>double-wiebe --help          <em># lista os comandos</em>
@@ -265,7 +264,8 @@ double-wiebe devices         <em># CPU, numba, CUDA, OpenCL e backends disponív
     <tr><th>Opção</th><th>Valores</th></tr>
     <tr><td><code>--backend</code></td><td><code>serial</code> (referência) |
         <code>cpu</code> (RK4 em lote) | <code>cpu-parallel</code> (processos,
-        bit-idêntico à serial) | <code>auto</code> (mini-benchmark)</td></tr>
+        bit-idêntico à serial) | <code>cuda</code> (RK4 em lote na GPU) |
+        <code>auto</code> (mini-benchmark)</td></tr>
     <tr><td><code>--integrator</code></td><td><code>auto</code> |
         <code>rk4_numpy</code> | <code>rk4_numba</code> | <code>scipy</code>
         (só no backend <code>cpu</code>)</td></tr>
@@ -365,17 +365,21 @@ double-wiebe devices         <em># CPU, numba, CUDA, OpenCL e backends disponív
     <tr><td><code>cpu-parallel</code></td><td>a implementação serial em
         processos — resultados <b>bit-idênticos</b> à serial; compensa com
         populações grandes</td></tr>
+    <tr><td><code>cuda</code></td><td>o mesmo RK4 em lote na GPU NVIDIA
+        (extra <code>.[cuda]</code>, CuPy), um thread por candidato. Com
+        <code>--precision float32</code> é o backend mais rápido (medido
+        até ~4.000× vs serial com 1000 candidatos numa RTX 4050); em
+        float64 só compensa com populações grandes. O resultado final
+        também é re-integrado com solve_ivp</td></tr>
     <tr><td><code>auto</code></td><td>escolhe o mais rápido por
         mini-benchmark</td></tr>
   </table>
 
   <h3>GPU (CUDA/OpenCL)?</h3>
-  <div class="box warn"><b>Não</b> são backends de execução — apenas
-  <b>detecção de hardware</b>. Os extras <code>.[cuda]</code>/<code>.[opencl]</code>
-  instalam cupy/pyopencl só para o comando <code>devices</code> e o painel
-  "Hardware detectado" da GUI. Justificativa e benchmarks em
-  <code>docs/hpc.md</code> (§2). O acelerador real do pacote é o backend
-  <code>cpu</code> com numba.</div>
+  <div class="box warn"><b>CUDA</b>: backend <code>cuda</code> — instale com
+  <code>pip install -e ".[cuda]"</code> (requer GPU NVIDIA e driver) e confira
+  com <code>double-wiebe devices</code>. <b>OpenCL</b>: apenas detecção de
+  hardware. Detalhes e benchmarks em <code>docs/hpc.md</code> (§3.1 e §4).</div>
 
   <h3>Ver o hardware</h3>
 <pre><code>double-wiebe devices</code></pre>

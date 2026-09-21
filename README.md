@@ -72,7 +72,7 @@ Extras opcionais (o programa funciona **sem nenhum deles**):
 ```bash
 pip install -e ".[cpu]"     # numba: RK4 em lote compilado (backend cpu)
 pip install -e ".[dev]"     # pytest
-pip install -e ".[cuda]"    # opcional: detecção CUDA (cupy) — ver docs/hpc.md
+pip install -e ".[cuda]"    # opcional: backend cuda na GPU NVIDIA (cupy) — ver docs/hpc.md
 pip install -e ".[opencl]"  # opcional: detecção OpenCL (pyopencl)
 ```
 
@@ -140,21 +140,22 @@ A calibração pode usar backends acelerados sem alterar as equações:
 ```bash
 double-wiebe calibrate --data ... --backend cpu --seed 42          # RK4 em lote (NumPy/Numba)
 double-wiebe calibrate --data ... --backend cpu-parallel --seed 42 # processos, idêntico à serial
+double-wiebe calibrate --data ... --backend cuda --precision float32 --seed 42  # GPU NVIDIA (CuPy)
 double-wiebe calibrate --data ... --backend auto --seed 42         # escolhe por mini-benchmark
 ```
 
 | Flag | Valores | Efeito |
 |---|---|---|
-| `--backend` | `serial` \| `cpu` \| `cpu-parallel` \| `auto` | serial é a referência; `cpu` avalia a população com RK4 de passo fixo em lote (a diferença de objetivo é medida e o resultado final é sempre re-integrado com solve_ivp); `cpu-parallel` usa a implementação serial em processos (resultados **idênticos**); `auto` escolhe por mini-benchmark |
+| `--backend` | `serial` \| `cpu` \| `cpu-parallel` \| `cuda` \| `auto` | serial é a referência; `cpu` avalia a população com RK4 de passo fixo em lote (a diferença de objetivo é medida e o resultado final é sempre re-integrado com solve_ivp); `cpu-parallel` usa a implementação serial em processos (resultados **idênticos**); `cuda` roda o mesmo RK4 em lote na GPU (extra `.[cuda]`; use `--precision float32` em GPUs de consumo); `auto` escolhe por mini-benchmark |
 | `--integrator` | `auto` \| `rk4_numpy` \| `rk4_numba` \| `scipy` | integrador do backend `cpu` |
 | `--workers` | inteiro | processos do `cpu-parallel` (default: núcleos−1) |
-| `--batch-size` | inteiro | candidatos por lote do `cpu` (0 = todos) |
+| `--batch-size` | inteiro | candidatos por lote do `cpu`/`cuda` (0 = todos) |
 | `--precision` | `float64` \| `float32` | precisão do modo acelerado (o re-run final é sempre float64) |
 | `--substeps` | inteiro | sub-passos do RK4 em lote (default 4) |
 | `--benchmark` | — | mede os backends e grava `benchmark_hpc.csv` na saída |
 | `--profile` | — | perfil cProfile da calibração (`profile_calibracao.pstats`) |
 
-Detalhes, garantias numéricas e justificativa do descarte de CUDA/OpenCL:
+Detalhes, garantias numéricas, backend CUDA e benchmarks da GPU:
 `docs/hpc.md`.
 
 ### 2.5 Outros comandos
@@ -271,7 +272,9 @@ limites, regularização), dados (unidades, filtros, erros), CLI
 (códigos de saída, `--set`, proteção de diretório, equivalência CLI×núcleo)
 e **backends HPC** (`test_backends.py`: equivalência serial↔cpu-parallel
 bit a bit, tolerância RK4↔solve_ivp ≤ 5 kPa, rk4_numpy≡rk4_numba,
-PENALTY sem NaN, fallback, reprodutibilidade).
+PENALTY sem NaN, fallback, reprodutibilidade) e **backend CUDA**
+(`test_cuda_backend.py`, pulado sem GPU: rk4_cuda≈rk4_numpy, mesma máscara
+de falhas, objetivo cuda≈cpu).
 
 ## 8. Estrutura
 
@@ -287,8 +290,8 @@ double_wiebe/
 │   ├── __init__.py   models.py  wiebe.py  geometry.py
 │   ├── thermodynamics.py  simulation.py  calibration.py
 │   ├── data_processing.py metrics.py  plotting.py
-│   ├── integrators/  (scipy referência; RK4 em lote NumPy e Numba)
-│   ├── backends/     (ComputeBackend: serial, cpu, cpu-parallel,
+│   ├── integrators/  (scipy referência; RK4 em lote NumPy, Numba e CUDA)
+│   ├── backends/     (ComputeBackend: serial, cpu, cpu-parallel, cuda,
 │   │                  detection, benchmark, select_backend/auto)
 │   ├── reporting.py   cli.py    gui.py
 └── tests/

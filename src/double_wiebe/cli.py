@@ -267,16 +267,17 @@ def calibrate(
         "(ex.: Rc,m1,alpha)."),
     # --- desempenho (plano HPC) -------------------------------------------
     backend: Optional[str] = typer.Option(
-        None, "--backend", help="serial | cpu | cpu-parallel | auto "
+        None, "--backend", help="serial | cpu | cpu-parallel | cuda | auto "
         "(default: serial)."),
     integrator: Optional[str] = typer.Option(
         None, "--integrator", help="Integrador do backend cpu: auto | "
-        "rk4_numpy | rk4_numba | scipy (default: auto)."),
+        "rk4_numpy | rk4_numba | scipy (default: auto). O backend cuda "
+        "usa sempre rk4_cuda."),
     workers: Optional[int] = typer.Option(
         None, "--workers", help="Processos do cpu-parallel (default: "
         "núcleos-1)."),
     batch_size: Optional[int] = typer.Option(
-        None, "--batch-size", help="Candidatos por lote do backend cpu "
+        None, "--batch-size", help="Candidatos por lote dos backends cpu/cuda "
         "(0 = todos de uma vez)."),
     precision: Optional[str] = typer.Option(
         None, "--precision", help="float64 | float32 (só no modo acelerado)."),
@@ -432,7 +433,7 @@ def benchmark(
     ang_unit: Optional[str] = typer.Option(None, "--ang-unit"),
     press_unit: Optional[str] = typer.Option(None, "--press-unit"),
 ):
-    """Compara os backends (serial, cpu RK4 NumPy/Numba, cpu-parallel) com
+    """Compara os backends (serial, cpu RK4 NumPy/Numba, cpu-parallel, cuda) com
     warm-up, média e desvio — benchmark reproduzível (regra 7 do plano HPC)."""
     try:
         from .backends.benchmark import print_benchmark, run_benchmark

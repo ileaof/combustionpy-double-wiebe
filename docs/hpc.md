@@ -14,9 +14,9 @@ conformidade com as regras fundamentais da especificação:
    automáticos (`tests/test_backends.py`) e re-run serial do melhor
    candidato ao final de toda calibração (`diferenca_integrador` no
    resultado).
-5. **CUDA/OpenCL não são dependências obrigatórias** — não são nem
-   dependências opcionais de execução; são apenas *detectados*
-   (`backends.detection`), com a justificativa abaixo.
+5. **CUDA/OpenCL não são dependências obrigatórias** — CUDA é um backend
+   opcional (`backend=cuda`, extra `.[cuda]`, CuPy; ver §3.1); OpenCL é
+   apenas *detectado* (`backends.detection`).
 6. **Funciona em máquina sem GPU** — sem GPU, sem numba, sem nada além de
    numpy/scipy, tudo funciona (backend serial é o default).
 7. **Nenhum ganho declarado sem benchmark reproduzível** —
@@ -57,14 +57,15 @@ sequencial — cada passo depende do anterior). Baseline salvo em
    (mesmo núcleo)   │   objective(x)  = caminho serial (referência)│
                     │   eval_batch(X) = backend.evaluate_population│
                     └──────┬───────────────────────────────────────┘
-                           │ select_backend (serial|cpu|cpu-parallel|auto)
-        ┌──────────────────┼─────────────────────────┐
-        ▼                  ▼                         ▼
-  SerialBackend      CPUBackend              MultiprocessingBackend
-  solve_ivp/adapt.   RK4 passo fixo em lote  ProcessPoolExecutor (spawn)
-  (referência,       (integrators/rk4_numpy  cada candidato com a MESMA
-  regra 1)           .py / rk4_numba.py)     implementação serial →
-                                             números idênticos
+                           │ select_backend (serial|cpu|cpu-parallel|cuda|auto)
+        ┌──────────────────┼─────────────────────────┬──────────────────────┐
+        ▼                  ▼                         ▼                      ▼
+  SerialBackend      CPUBackend              MultiprocessingBackend   CUDABackend
+  solve_ivp/adapt.   RK4 passo fixo em lote  ProcessPoolExecutor      RK4 em lote na GPU
+  (referência,       (integrators/rk4_numpy  (spawn); cada candidato  (integrators/
+  regra 1)           .py / rk4_numba.py)     com a MESMA implemen-    rk4_cuda.py, CuPy;
+                                             tação serial → números   1 thread/candidato)
+                                             idênticos
 ```
 
 - **`ComputeBackend`** (`backends/base.py`): `name`, `is_available()`,
@@ -75,7 +76,8 @@ sequencial — cada passo depende do anterior). Baseline salvo em
   backend indisponível degrada com `UserWarning` para a serial.
 - **Integradores** (`integrators/`): `scipy_integrator` (referência),
   `rk4_numpy` (lote NumPy), `rk4_numba` (compilado, cai para NumPy sem
-  numba). `get_integrator(nome)` para acesso direto.
+  numba), `rk4_cuda` (GPU, CuPy). `get_integrator(nome)` para acesso
+  direto.
 - **Precisão**: `float64` (default) ou `float32` no RK4 em lote. O
   **resultado final é sempre re-integrado em float64 com solve_ivp** —
   float32 nunca chega ao usuário como resposta.
@@ -87,16 +89,14 @@ sequencial — cada passo depende do anterior). Baseline salvo em
 - **Dentro de um candidato**: a integração é sequencial por natureza
   (cada passo usa o estado do anterior). Não há ganho real — não foi
   forçado (instrução da especificação).
-- **CUDA/OpenCL**: a máquina de referência **não possui GPU nem as
-  bibliotecas** — qualquer ganho seria *declarado* sem benchmark
-  reproduzível, violando a regra 7. Além disso, para 3 EDOs por candidato
-  o custo de transferência (host↔device) por iteração DE domina o
-  cálculo; backends GPU aqui não seriam testáveis nem reprodutíveis.
-  **Decisão**: CUDA/OpenCL ficam em `backends/detection.py` (detecção
-  para o comando `devices`/GUI) e nos extras `.[cuda]`/`.[opencl]`
-  documentados, mas não são backends de execução. Se um hardware CUDA
-  existir e o gargalo se mantiver, o caminho natural é um kernel de lote
-  RK4 (a mesma matemática de `rk4_numpy`, já validada).
+- **OpenCL**: sem hardware/bibliotecas para validar — fica apenas em
+  `backends/detection.py` (detecção para `devices`/GUI) e no extra
+  `.[opencl]`; não é backend de execução.
+- **CUDA** (histórico): na primeira versão a máquina de referência não
+  tinha GPU, e CUDA ficou só na detecção. Com uma GPU disponível
+  (RTX 4050 Laptop), foi implementado o caminho previsto — um kernel de
+  lote RK4 com a mesma matemática de `rk4_numpy` — validado e medido
+  conforme as regras 4 e 7 (§3.1 e §4).
 
 ## 3. Modo acelerado (`backend=cpu`) — o que muda e o que é garantido
 
@@ -124,6 +124,29 @@ sequencial — cada passo depende do anterior). Baseline salvo em
   os mesmos do backend escolhido. **PSO** (implementação própria) não tem
   esse efeito: com `backend="cpu-parallel"`, a trajetória é **bit-idêntica**
   à serial (mesma seed).
+
+### 3.1 Backend `cuda` (GPU)
+
+- **Kernel** (`integrators/rk4_cuda.py`): `cupy.RawKernel` compilado com
+  NVRTC na primeira chamada (cache em disco do CuPy depois); **um thread
+  por candidato**, com o mesmo laço de `rk4_numba` (RK4 clássico,
+  `substeps`, verificação |k| ≤ 1e12 e P,T > 0 a cada sub-passo; falha →
+  linha NaN → PENALTY). Mesmo kernel em `double` e em `float`
+  (`precision`).
+- **Transferências**: `theta`/`P_exp` ficam em cache na GPU; o RMSE é
+  reduzido na GPU. Por geração sobem só os candidatos (S × 10) e descem
+  só S valores — o custo host↔device que motivou a decisão anterior fica
+  desprezível. A regularização é calculada no host (mesmas fórmulas).
+- **Equivalência**: em float64 a GPU difere de `rk4_numpy` apenas pelos
+  ULPs das funções matemáticas do device (FMA desligado com
+  `-fmad=false`): erro relativo medido ≤ 3e-15 em P_sim e **a mesma
+  máscara de candidatos falhos** (`tests/test_cuda_backend.py`, rtol 1e-12).
+- **float32**: GPUs de consumo têm throughput FP64 de 1/32–1/64 do FP32;
+  em float32 o backend `cuda` é ~20× mais rápido que em float64, com
+  diferença ≤ 0,03 kPa em P_sim vs float64. O resultado final continua
+  sendo re-integrado em float64 com solve_ivp.
+- **auto**: o `cuda` participa do mini-benchmark de `choose_backend`
+  (float64, com o tempo de compilação do kernel excluído da medida).
 
 ## 4. Benchmarks medidos
 
@@ -164,6 +187,33 @@ candidatos válidos em comum, a discrepância máxima medida foi 4,0 kPa
 (N=1000, inclui candidatos de borda; em candidatos de interior,
 < 0,6 kPa — ver §3).
 
+**GPU** (21-09-2026, Intel Core 13ª geração, 20 núcleos lógicos +
+NVIDIA RTX 4050 Laptop 6 GB, Windows 11, Python 3.12.6, CuPy 14.2,
+mesmos dados e comando acima):
+
+| N | Backend | ms/cand | Speedup | max |ΔRMSE| vs serial |
+|---:|---|---:|---:|---:|
+| 1000 | serial (referência) | 28,07 | 1× | — |
+| 1000 | cpu (rk4 numba) | 0,52 | 54× | 4,01 kPa |
+| 1000 | cpu-parallel | 3,36 | 8,4× | 0,000 |
+| 1000 | **cuda (float64)** | 0,13 | **223×** | 4,01 kPa |
+| 1000 | **cuda (float32)** | 0,0066 | **4.239×** | 4,01 kPa |
+| 100 | serial | 27,92 | 1× | — |
+| 100 | cpu (rk4 numba) | 0,54 | 52× | 0,55 kPa |
+| 100 | cuda (float64) | 1,25 | 22× | 0,55 kPa |
+| 100 | cuda (float32) | 0,069 | 402× | 0,55 kPa |
+| 20 | serial | 25,53 | 1× | — |
+| 20 | cpu (rk4 numba) | 0,53 | 48× | 0,17 kPa |
+| 20 | cuda (float64) | 3,37 | 7,6× | 0,17 kPa |
+| 20 | cuda (float32) | 0,33 | 77× | 0,17 kPa |
+
+O erro vs serial do `cuda` é o mesmo do `cpu` (é o mesmo integrador RK4;
+GPU ≡ CPU até ~1e-15 relativo em float64). Em float64 a GPU só supera o
+numba com populações grandes (≳ 200 candidatos): com poucos candidatos
+há poucos threads e cada thread FP64 é lento. Em float32 a GPU vence em
+todos os tamanhos medidos; o tempo por chamada fica em ~7 ms (latência de
+lançamento/sincronização), então o ganho cresce com N.
+
 Calibração real (DE curto, seed 42): serial ≈ 20 min (default DE) vs
 **≈ 40 s** com `backend=cpu` (numba) — aceleração ≈ 28× na prática, com
 re-validação serial automática. PSO (25 iterações × 12 partículas):
@@ -189,6 +239,7 @@ CLI:
 double-wiebe devices                                   # hardware + backends
 double-wiebe calibrate --data ... --backend auto       # escolhe o mais rápido
 double-wiebe calibrate --data ... --backend cpu-parallel --workers 8
+double-wiebe calibrate --data ... --backend cuda --precision float32   # GPU
 double-wiebe calibrate --data ... --benchmark --profile --output outputs/run
 ```
 
@@ -214,4 +265,13 @@ YAML (`calibration:`): chaves planas `backend`, `integrator`, `workers`,
 - determinismo (mesma entrada → mesmos valores);
 - calibração PSO `cpu-parallel` ≡ serial (RMSE e parâmetros exatos) e
   `cpu` com `diferenca_integrador` < 5 kPa;
+
+`tests/test_cuda_backend.py` (pulado sem CuPy/GPU):
+
+- `rk4_cuda` ≈ `rk4_numpy` (rtol 1e-12) com a **mesma máscara de falhas**,
+  inclusive com candidatos não físicos forçados;
+- objetivo do backend `cuda` ≈ `cpu` (rtol 1e-9), PENALTY nos mesmos
+  candidatos, `batch_size` que não divide S;
+- float32 dentro de 5 kPa da serial; `select_backend("cuda")` e interface;
+- calibração PSO `cuda` ≈ `cpu` e `diferenca_integrador` < 5 kPa;
 - benchmark reproduzível.

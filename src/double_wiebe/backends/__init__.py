@@ -7,10 +7,9 @@ Uso:
     backend = select_backend("auto")          # mini-benchmark
     backend = select_backend("cpu-parallel")  # explícito
 
-Nomes: "serial" | "cpu" | "cpu-parallel" | "auto".
-CUDA/OpenCL: não implementados como backends — veja docs/hpc.md (sem GPU
-na máquina de referência e custo de transferência domina neste problema;
-a detecção de hardware continua disponível em detection.py).
+Nomes: "serial" | "cpu" | "cpu-parallel" | "cuda" | "auto".
+cuda: RK4 em lote na GPU (CuPy, extra [cuda]) — veja docs/hpc.md.
+OpenCL: apenas detecção de hardware (detection.py).
 """
 from __future__ import annotations
 
@@ -19,10 +18,11 @@ from typing import Optional
 from .base import BackendNotAvailableError, ComputeBackend, BackendError
 from .serial_backend import (CPUBackend, MultiprocessingBackend,
                              SerialBackend)
+from .cuda_backend import CUDABackend
 from . import detection
 
 __all__ = ["ComputeBackend", "BackendError", "BackendNotAvailableError",
-           "SerialBackend", "CPUBackend", "MultiprocessingBackend",
+           "SerialBackend", "CPUBackend", "MultiprocessingBackend", "CUDABackend",
            "get_available_backends", "get_all_backends", "select_backend",
            "detect_hardware", "hardware_report"]
 
@@ -33,6 +33,7 @@ _BACKEND_CLASSES = {
     "serial": SerialBackend,
     "cpu": CPUBackend,
     "cpu-parallel": MultiprocessingBackend,
+    "cuda": CUDABackend,
 }
 
 
@@ -58,7 +59,7 @@ def select_backend(nome: str = "serial", workers: Optional[int] = None,
                    integrator: str = "auto",
                    fallback: bool = True) -> ComputeBackend:
     """Seleciona o backend pedido; com fallback=True, degrada com aviso:
-    cpu-parallel -> serial (1 núcleo). "auto" escolhe por mini-benchmark
+    cpu-parallel -> serial (1 núcleo); cuda sem GPU/CuPy -> serial. "auto" escolhe por mini-benchmark
     (ver benchmark.py: escolhe o mais rápido em uma população pequena).
 
     ``integrator`` só afeta o backend `cpu`: "auto" usa numba quando

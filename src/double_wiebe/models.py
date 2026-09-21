@@ -247,7 +247,7 @@ class CalibrationConfig:
     delta_min_deg: float = 5.0     # duração mínima física [graus]
     w_ridge: float = 0.0           # regularização ridge (afastar dos limites)
     # Desempenho (plano HPC)
-    backend: str = "serial"        # serial | cpu | cpu-parallel | auto
+    backend: str = "serial"        # serial | cpu | cpu-parallel | cuda | auto
     integrator: str = "auto"       # auto | scipy | rk4_numpy | rk4_numba
     workers: Optional[int] = None  # processos (cpu-parallel); None = auto
     batch_size: int = 0            # candidatos por lote (0 = tudo de uma vez)
@@ -255,7 +255,7 @@ class CalibrationConfig:
     substeps: int = 4              # sub-passos do RK4 em lote (modo acelerado)
 
     METHODS = ("differential-evolution", "pso", "least-squares")
-    BACKENDS = ("serial", "cpu", "cpu-parallel", "auto")
+    BACKENDS = ("serial", "cpu", "cpu-parallel", "cuda", "auto")
     PRECISIONS = ("float64", "float32")
     INTEGRATORS = ("auto", "scipy", "rk4_numpy", "rk4_numba")
 

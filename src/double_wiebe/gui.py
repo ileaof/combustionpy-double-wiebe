@@ -573,8 +573,9 @@ with TAB_CALIB:
             st.caption("serial = referência (solve_ivp). cpu = RK4 em lote "
                        "(NumPy/Numba; resultado re-validado com solve_ivp). "
                        "cpu-parallel = processos com a implementação serial "
-                       "(idêntica à referência). auto = escolhe por "
-                       "mini-benchmark.")
+                       "(idêntica à referência). cuda = RK4 em lote na GPU "
+                       "(CuPy; float32 é muito mais rápido em GPUs de "
+                       "consumo). auto = escolhe por mini-benchmark.")
             hc1, hc2, hc3 = st.columns(3)
             with hc1:
                 backend_cal = st.selectbox(

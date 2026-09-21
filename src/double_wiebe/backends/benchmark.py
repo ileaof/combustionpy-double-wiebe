@@ -2,7 +2,8 @@
 """
 benchmark.py — Benchmark reproduzível dos backends (plano HPC, regra 7).
 
-Compara serial / cpu (RK4 lote NumPy) / cpu (Numba) / cpu-parallel para
+Compara serial / cpu (RK4 lote NumPy) / cpu (Numba) / cpu-parallel / cuda
+(float64 e float32, se houver GPU) para
 tamanhos de população variados, com warm-up, média e desvio-padrão, erro
 máximo contra a referência serial e gravação opcional em CSV. Também fornece
 a seleção automática (`select_backend("auto")`) por mini-benchmark.
@@ -17,6 +18,7 @@ from typing import List, Optional
 import numpy as np
 
 from ..models import PARAM_ORDER
+from .cuda_backend import CUDABackend
 from .serial_backend import (CPUBackend, MultiprocessingBackend,
                              SerialBackend)
 
@@ -61,6 +63,12 @@ def run_benchmark(theta, P_exp, engine, wiebe, sim, calib,
     mpb = MultiprocessingBackend()
     if mpb.is_available():
         backends["cpu-parallel"] = mpb
+    precisoes = {}
+    gpu = CUDABackend()
+    if gpu.is_available():
+        backends["cuda (float64)"] = gpu
+        backends["cuda (float32)"] = gpu
+        precisoes["cuda (float32)"] = "float32"
 
     linhas: List[dict] = []
     for S in tamanhos:
@@ -72,8 +80,10 @@ def run_benchmark(theta, P_exp, engine, wiebe, sim, calib,
             f = None
             for r in range(rep + 1):
                 t0 = time.perf_counter()
-                f = b.evaluate_population(X_full, theta, P_exp, engine,
-                                          wiebe, sim, calib, substeps=substeps)
+                f = b.evaluate_population(
+                    X_full, theta, P_exp, engine, wiebe, sim, calib,
+                    precision=precisoes.get(nome, "float64"),
+                    substeps=substeps)
                 dt = time.perf_counter() - t0
                 if warmup and r == 0:
                     continue                     # descarta (aquecimento)
@@ -157,9 +167,15 @@ def choose_backend(workers: Optional[int] = None, substeps: int = 4,
     mpb = MultiprocessingBackend(workers=workers)
     if mpb.is_available():
         candidatos["cpu-parallel"] = mpb
+    gpu = CUDABackend()
+    if gpu.is_available():
+        candidatos["cuda"] = gpu
 
     melhor, t_melhor = None, np.inf
     for nome, b in candidatos.items():
+        if nome == "cuda":           # compilação do kernel fora da medida
+            b.evaluate_population(X_full[:1], theta, P, engine, wiebe, sim,
+                                  calib, substeps=substeps)
         t0 = time.perf_counter()
         b.evaluate_population(X_full, theta, P, engine, wiebe, sim, calib,
                               substeps=substeps)
