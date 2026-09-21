@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ajuda — Double Wiebe Combustion Analysis</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --ink: #1d2430; --muted: #5b6472;
+    --accent: #0b62d6; --accent-soft: #e8f1fd; --border: #dfe3ea;
+    --code-bg: #f0f2f5; --ok: #0a7d38; --ok-soft: #e7f5ec;
+    --warn: #9a6700; --warn-soft: #fff4d6;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14171c; --card: #1c2129; --ink: #e6e9ee; --muted: #9aa3b0;
+      --accent: #5ea1f5; --accent-soft: #1d2c40; --border: #2c333d;
+      --code-bg: #232a33; --ok: #4cc47e; --ok-soft: #17301f;
+      --warn: #d9a62e; --warn-soft: #33290f;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.65 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    padding: 24px 16px 64px;
+  }
+  main { max-width: 900px; margin: 0 auto; }
+  header.hero {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 28px 28px 20px; margin-bottom: 24px;
+  }
+  h1 { margin: 0 0 6px; font-size: 26px; }
+  .hero p { margin: 0; color: var(--muted); }
+  h2 {
+    font-size: 20px; margin: 36px 0 12px; padding-bottom: 6px;
+    border-bottom: 2px solid var(--border);
+  }
+  h3 { font-size: 16px; margin: 22px 0 8px; }
+  section {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 8px 28px 20px; margin-bottom: 18px;
+  }
+  code {
+    font-family: Consolas, "Cascadia Code", Menlo, monospace;
+    background: var(--code-bg); border-radius: 5px; padding: 1px 6px;
+    font-size: 13px;
+  }
+  pre {
+    background: #000000; color: #ffffff; border: 1px solid #333333;
+    border-radius: 8px; padding: 14px 16px; overflow-x: auto;
+    font-size: 13px; line-height: 1.55;
+  }
+  pre code { background: none; padding: 0; color: #ffffff; }
+  .prompt::before { content: "PS> "; color: #9aa3b0; user-select: none; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; margin: 10px 0; }
+  th, td { border: 1px solid var(--border); padding: 7px 10px; text-align: left; vertical-align: top; }
+  th { background: var(--accent-soft); }
+  .box {
+    border-radius: 8px; padding: 12px 16px; margin: 14px 0;
+    border: 1px solid var(--border); font-size: 14px;
+  }
+  .box.ok { background: var(--ok-soft); border-color: var(--ok); }
+  .box.warn { background: var(--warn-soft); border-color: var(--warn); }
+  .box b:first-child { display: inline-block; margin-right: 6px; }
+  nav.toc {
+    background: var(--accent-soft); border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px 24px; margin-bottom: 24px;
+  }
+  nav.toc h2 { border: none; margin: 0 0 8px; font-size: 16px; }
+  nav.toc ol { margin: 0; padding-left: 22px; columns: 2; }
+  nav.toc a { color: var(--accent); text-decoration: none; }
+  nav.toc a:hover { text-decoration: underline; }
+  kbd {
+    background: var(--code-bg); border: 1px solid var(--border); border-bottom-width: 2px;
+    border-radius: 4px; padding: 0 5px; font-size: 12px; font-family: inherit;
+  }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: .4px;
+    border-radius: 20px; padding: 1px 9px; margin-left: 8px; vertical-align: 2px;
+  }
+  .tag.req { background: var(--warn-soft); color: var(--warn); }
+  .tag.opt { background: var(--ok-soft); color: var(--ok); }
+  @media (max-width: 640px) { nav.toc ol { columns: 1; } section { padding: 6px 18px 16px; } }
+</style>
+</head>
+<body>
+<main>
+
+<header class="hero">
+  <h1>🔧 Ajuda — Double Wiebe Combustion Analysis</h1>
+  <p>Simulação e calibração do modelo Double Wiebe (duas fases de Wiebe
+  ponderadas por <i>α</i>), extensão bifásica do modelo Single Wiebe
+  desenvolvido na dissertação de M.Sc. de L. Queiroz sob orientação do
+  Prof. I. L. Ferreira. Núcleo científico único usado pela CLI (Typer) e
+  pela GUI (Streamlit).</p>
+</header>
+
+<nav class="toc">
+  <h2>Sumário</h2>
+  <ol>
+    <li><a href="#requisitos">Requisitos e instalação</a></li>
+    <li><a href="#estrutura">Estrutura do projeto</a></li>
+    <li><a href="#inicio-rapido">Início rápido</a></li>
+    <li><a href="#config">Arquivo de configuração (YAML)</a></li>
+    <li><a href="#cli">Referência da linha de comando</a></li>
+    <li><a href="#gui">Interface gráfica (GUI — Streamlit)</a></li>
+    <li><a href="#calib-arquivo">Salvar / abrir calibração (JSON)</a></li>
+    <li><a href="#hpc">Aceleração (backends) e hardware</a></li>
+    <li><a href="#api">Uso como biblioteca</a></li>
+    <li><a href="#saidas">Exportações</a></li>
+    <li><a href="#testes">Testes</a></li>
+    <li><a href="#solucao-problemas">Solução de problemas</a></li>
+  </ol>
+</nav>
+
+<!-- ================================================================= -->
+<section id="requisitos">
+  <h2>1. Requisitos e instalação</h2>
+
+  <ul>
+    <li>Python <b>3.11 ou superior</b> (testado com 3.11.4).</li>
+    <li>Pacotes <span class="tag req">obrigatórios</span>: <code>numpy</code>,
+        <code>pandas</code>, <code>scipy</code>, <code>plotly</code>,
+        <code>matplotlib</code>, <code>streamlit</code>, <code>typer</code>,
+        <code>PyYAML</code> — instalados automaticamente.</li>
+    <li>Pacotes <span class="tag opt">opcionais</span>: <code>numba</code>
+        (backend <code>cpu</code> acelerado), <code>cupy</code> /
+        <code>pyopencl</code> (apenas detecção de GPU — não são backends
+        de execução, ver <a href="#hpc">§ 8</a>).</li>
+  </ul>
+
+  <h3>Instalação a partir do clone (recomendado)</h3>
+<pre><code>git clone https://github.com/ileaof/combustionpy-double-wiebe.git
+cd combustionpy-double-wiebe
+python -m venv .venv
+.venv\Scripts\Activate.ps1          <em># Windows (PowerShell)</em>
+python -m pip install --upgrade pip
+pip install -e .                    <em># instala o pacote + o comando `double-wiebe`</em></code></pre>
+
+  <p>Extras opcionais:</p>
+<pre><code>pip install -e ".[cpu]"     <em># numba: RK4 em lote compilado (backend cpu)</em>
+pip install -e ".[dev]"     <em># pytest</em>
+pip install -e ".[cuda]"    <em># cupy: APENAS detecção de GPU em `devices`/GUI</em>
+pip install -e ".[opencl]"  <em># pyopencl: APENAS detecção de dispositivos</em></code></pre>
+
+  <div class="box warn"><b>Nota:</b> os extras <code>[cuda]</code> e
+  <code>[opencl]</code> <u>não</u> aceleram a calibração — CUDA/OpenCL não são
+  backends de execução deste pacote (justificativa em <code>docs/hpc.md</code>).
+  O caminho de aceleração real é o backend <code>cpu</code> (numba),
+  <a href="#hpc">§ 8</a>.</div>
+
+  <h3>Verificar a instalação</h3>
+<pre><code>double-wiebe --help          <em># lista os comandos</em>
+double-wiebe validate        <em># caso de referência: RMSE 412,658 kPa / R² 0,930841</em>
+double-wiebe devices         <em># CPU, numba, CUDA, OpenCL e backends disponíveis</em></code></pre>
+</section>
+
+<!-- ================================================================= -->
+<section id="estrutura">
+  <h2>2. Estrutura do projeto</h2>
+<pre><code>combustionpy-double-wiebe/
+├── src/double_wiebe/          <em># núcleo científico + CLI + GUI</em>
+│   ├── models.py              <em># config YAML → EngineConfig/WiebeParameters/...</em>
+│   ├── wiebe.py               <em># Double Wiebe (duas fases, ponderadas por α)</em>
+│   ├── geometry.py            <em># volume/área do cilindro</em>
+│   ├── thermodynamics.py      <em># balanços, Hohenberg, propriedades</em>
+│   ├── simulation.py          <em># run_simulation (solve_ivp DOP853)</em>
+│   ├── calibration.py         <em># DE/PSO/least-squares + backends HPC</em>
+│   ├── data_processing.py     <em># leitura e preparo da série experimental</em>
+│   ├── metrics.py  plotting.py  reporting.py
+│   ├── cli.py  gui.py         <em># sem equações — só chamam o núcleo</em>
+│   ├── integrators/           <em># scipy (referência), rk4_numpy, rk4_numba</em>
+│   └── backends/              <em># serial, cpu, cpu-parallel, auto, detecção</em>
+├── configs/example.yaml       <em># configuração de exemplo completa</em>
+├── data/example_pressure.txt  <em># série experimental (θ em rad, P em bar)</em>
+├── docs/hpc.md                <em># arquitetura de aceleração + benchmarks</em>
+├── tests/                     <em># 112 testes (pytest)</em>
+├── tools/  validation/        <em># profiling, benchmark, paridade Mathematica</em>
+└── pyproject.toml</code></pre>
+</section>
+
+<!-- ================================================================= -->
+<section id="inicio-rapido">
+  <h2>3. Início rápido</h2>
+
+  <h3>Simulação de referência (dados de exemplo)</h3>
+<pre><code>double-wiebe simulate --data data/example_pressure.txt `
+    --config configs/example.yaml --output outputs/run_01</code></pre>
+  <p>Escreve em <code>outputs/run_01/</code>: <code>results.csv</code>,
+  <code>parameters.yaml</code>, <code>metrics.json</code>, gráficos e
+  <code>report.html</code> — <a href="#saidas">§ 10</a>.</p>
+
+  <h3>Calibração</h3>
+<pre><code>double-wiebe calibrate --data data/example_pressure.txt `
+    --config configs/example.yaml --output outputs/calib_01 --seed 42</code></pre>
+  <p>Por default (YAML de exemplo) calibra os 8 parâmetros livres
+  (<code>Rc, theta01, delta1, m1, theta02, delta2, m2, alpha</code>) com
+  differential evolution; ao final o melhor candidato é re-integrado com
+  solve_ivp (o RMSE reportado é sempre do re-run serial).</p>
+
+  <h3>GUI</h3>
+<pre><code>double-wiebe gui          <em># abre o navegador em http://localhost:8501</em></code></pre>
+</section>
+
+<!-- ================================================================= -->
+<section id="config">
+  <h2>4. Arquivo de configuração (YAML)</h2>
+  <p>O <code>configs/example.yaml</code> é auto-documentado; seções:</p>
+  <table>
+    <tr><th>Seção</th><th>Conteúdo</th></tr>
+    <tr><td><code>data</code></td><td>colunas do arquivo (<code>angle_col</code>,
+        <code>pressure_col</code>), unidades (<code>radianos|graus</code>,
+        <code>Pa|kPa|bar</code>), filtro <code>theta_min/theta_max</code>
+        [rad], separador, cabeçalho</td></tr>
+    <tr><td><code>engine</code></td><td>geometria (mm), <code>rpm</code>,
+        <code>Rc</code>, <code>m_fuel_kg_per_cycle</code>,
+        <code>LHV_kJ_per_kg</code>, <code>kappa</code>,
+        <code>T1_K</code>, <code>Tw_K</code>, <code>heat_transfer</code></td></tr>
+    <tr><td><code>wiebe</code></td><td><code>mode</code>
+        (<code>continuous|bounded</code>), ângulos em GRAUS no YAML
+        (<code>theta01_deg, delta1_deg, theta02_deg, delta2_deg</code>),
+        <code>m1/a1, m2/a2</code>, <code>alpha</code></td></tr>
+    <tr><td><code>simulation</code></td><td><code>method</code>
+        (<code>DOP853|LSODA|RK45</code>), <code>rtol</code>,
+        <code>atol</code></td></tr>
+    <tr><td><code>calibration</code></td><td><code>method</code>
+        (<code>differential-evolution|pso|least-squares</code>),
+        <code>selected</code> (parâmetros livres), <code>seed</code>,
+        <code>maxiter</code>, <code>popsize</code>, <code>tol</code>,
+        <code>polish</code>, parâmetros PSO, regularização</td></tr>
+  </table>
+  <p>Sobrescritas rápidas sem editar o YAML (repetível):</p>
+<pre><code>--set wiebe.alpha=0.55 --set calibration.seed=42 --set data.pressure_unit=kPa</code></pre>
+</section>
+
+<!-- ================================================================= -->
+<section id="cli">
+  <h2>5. Referência da linha de comando</h2>
+  <table>
+    <tr><th>Comando</th><th>O que faz</th></tr>
+    <tr><td><code>double-wiebe simulate</code></td><td>simula o modelo com os
+        parâmetros configurados (<code>--data --config --output --overwrite
+        --set --quiet/--verbose</code>)</td></tr>
+    <tr><td><code>double-wiebe calibrate</code></td><td>calibração global +
+        polish (<code>--method --seed --maxiter --popsize --select
+        Rc,m1,alpha --polish/--no-polish</code>)</td></tr>
+    <tr><td><code>double-wiebe validate</code></td><td>valida config/dados
+        contra o caso de referência</td></tr>
+    <tr><td><code>double-wiebe plot</code></td><td>gera os gráficos estáticos
+        de um diretório de resultado (<code>plot outputs/run_01</code>)</td></tr>
+    <tr><td><code>double-wiebe devices</code></td><td>hardware detectado
+        (CPU, numba, CUDA, OpenCL) + backends disponíveis</td></tr>
+    <tr><td><code>double-wiebe benchmark</code></td><td>benchmark reproduzível
+        dos backends (warm-up, média, desvio, speedup; grava CSV)</td></tr>
+    <tr><td><code>double-wiebe example-config</code></td><td>grava/imprime o
+        YAML de exemplo (<code>--force</code> para sobrescrever)</td></tr>
+    <tr><td><code>double-wiebe gui</code></td><td>abre a GUI Streamlit
+        (<code>--port 8501 --headless</code>)</td></tr>
+  </table>
+
+  <h3>Opções de desempenho do <code>calibrate</code></h3>
+  <table>
+    <tr><th>Opção</th><th>Valores</th></tr>
+    <tr><td><code>--backend</code></td><td><code>serial</code> (referência) |
+        <code>cpu</code> (RK4 em lote) | <code>cpu-parallel</code> (processos,
+        bit-idêntico à serial) | <code>auto</code> (mini-benchmark)</td></tr>
+    <tr><td><code>--integrator</code></td><td><code>auto</code> |
+        <code>rk4_numpy</code> | <code>rk4_numba</code> | <code>scipy</code>
+        (só no backend <code>cpu</code>)</td></tr>
+    <tr><td><code>--workers</code></td><td>processos do
+        <code>cpu-parallel</code> (default: núcleos − 1)</td></tr>
+    <tr><td><code>--precision</code></td><td><code>float64</code> (default) |
+        <code>float32</code> (o resultado final é sempre re-integrado em
+        float64)</td></tr>
+    <tr><td><code>--substeps</code></td><td>sub-passos do RK4 entre pontos
+        experimentais (default 4)</td></tr>
+    <tr><td><code>--benchmark</code></td><td>mede os backends antes da
+        calibração e grava <code>benchmark_hpc.csv</code></td></tr>
+    <tr><td><code>--profile</code></td><td>perfil cProfile da calibração</td></tr>
+  </table>
+
+  <h3>Códigos de saída</h3>
+  <p><code>0</code> sucesso · <code>1</code> falha de execução ·
+  <code>2</code> erro de uso (arquivo inexistente, diretório de saída não
+  vazio sem <code>--overwrite</code>, configuração inválida).</p>
+</section>
+
+<!-- ================================================================= -->
+<section id="gui">
+  <h2>6. Interface gráfica (GUI — Streamlit)</h2>
+  <p>Sete abas, todas usando o mesmo núcleo da CLI:</p>
+  <table>
+    <tr><th>Aba</th><th>O que faz</th></tr>
+    <tr><td><b>Experimental Data</b></td><td>upload do arquivo
+        (.txt/.csv/.tsv), separador, colunas, unidades (radianos/graus;
+        Pa/kPa/bar), filtro θ, suavização; resumo da série</td></tr>
+    <tr><td><b>Engine Setup</b></td><td>geometria do motor, rotação, Rc,
+        combustível, PCI, κ, T1, Tw, perda de calor</td></tr>
+    <tr><td><b>Double Wiebe</b></td><td>parâmetros das duas fases
+        (θ₀₁/Δ₁/m₁/a₁, θ₀₂/Δ₂/m₂/a₂) e fração de energia α; modo
+        continuous/bounded</td></tr>
+    <tr><td><b>Simulation</b></td><td>opções do integrador e execução da
+        simulação com os parâmetros atuais</td></tr>
+    <tr><td><b>Calibration</b></td><td>seleção dos parâmetros livres e
+        limites, método (DE/PSO), seed/iterações e o expander
+        <b>Desempenho</b> (backend/integrador/workers/precisão/sub-passos +
+        painel "Hardware detectado"); executa com <b>Start calibration</b>,
+        com barra de progresso (thread separada)</td></tr>
+    <tr><td><b>Results</b></td><td>RMSE/R², indicadores (pico de pressão, T
+        máx, fração queimada, calores), gráficos interativos (Plotly) e o
+        diagrama P–V</td></tr>
+    <tr><td><b>Export</b></td><td>downloads de results.csv,
+        parameters.yaml, metrics.json, convergence.csv, PNGs estáticos,
+        PDF (4 figuras) e relatório HTML</td></tr>
+  </table>
+
+  <div class="box ok"><b>Carregar calibração:</b> na aba Calibration, o
+  controle <b>📂 Carregar calibração (.json)</b> fica junto ao botão
+  <b>Start calibration</b> — abre um arquivo salvo e restaura os parâmetros
+  <u>sem precisar recalibrar</u>. Ver <a href="#calib-arquivo">§ 7</a>.</div>
+
+  <div class="box ok"><b>Aplicar calibração:</b> depois de calibrar (ou
+  carregar um arquivo), o botão <b>Aplicar parâmetros calibrados e rodar a
+  simulação</b> roda a simulação final com os parâmetros do resultado.</div>
+</section>
+
+<!-- ================================================================= -->
+<section id="calib-arquivo">
+  <h2>7. Salvar / abrir calibração (JSON)</h2>
+
+  <ul>
+    <li><b>Salvar</b>: aba Calibration → <b>⬇ Salvar calibração (JSON)</b>
+        (aparece quando existe um resultado de calibração). O arquivo
+        <code>calibracao_double_wiebe.json</code> embute: parâmetros,
+        histórico da busca, sensibilidade, alertas, configurações de
+        motor/Wiebe e os dados experimentais usados (θ em rad, P em kPa).</li>
+    <li><b>Abrir</b>: aba Calibration → <b>📂 Carregar calibração (.json)</b>,
+        junto ao <b>Start calibration</b> — disponível desde a abertura da
+        sessão, sem precisar calibrar antes. Os parâmetros são restaurados
+        imediatamente; os dados embutidos só são restaurados se a sessão
+        ainda não tiver dados (nunca substitui dados carregados).</li>
+  </ul>
+
+  <div class="box warn"><b>Atenção:</b> o formato
+  (<code>"formato": "double-wiebe-calibracao"</code>) é próprio do projeto e
+  <u>não</u> é intercambiável com o do Single Wiebe
+  (<code>single-wiebe-calibracao</code>).</div>
+</section>
+
+<!-- ================================================================= -->
+<section id="hpc">
+  <h2>8. Aceleração (backends) e hardware</h2>
+
+  <table>
+    <tr><th>Backend</th><th>Descrição</th></tr>
+    <tr><td><code>serial</code></td><td>referência — solve_ivp/DOP853
+        adaptativo (rtol=atol 1e-9)</td></tr>
+    <tr><td><code>cpu</code></td><td>RK4 clássico de passo fixo em lote
+        (integrador <code>auto</code>: usa numba se instalado; senão NumPy).
+        Speedup medido ≈ 38× (numba); o melhor candidato é sempre
+        re-integrado em float64 com solve_ivp ao final
+        (<code>diferenca_integrador</code> reportada)</td></tr>
+    <tr><td><code>cpu-parallel</code></td><td>a implementação serial em
+        processos — resultados <b>bit-idênticos</b> à serial; compensa com
+        populações grandes</td></tr>
+    <tr><td><code>auto</code></td><td>escolhe o mais rápido por
+        mini-benchmark</td></tr>
+  </table>
+
+  <h3>GPU (CUDA/OpenCL)?</h3>
+  <div class="box warn"><b>Não</b> são backends de execução — apenas
+  <b>detecção de hardware</b>. Os extras <code>.[cuda]</code>/<code>.[opencl]</code>
+  instalam cupy/pyopencl só para o comando <code>devices</code> e o painel
+  "Hardware detectado" da GUI. Justificativa e benchmarks em
+  <code>docs/hpc.md</code> (§2). O acelerador real do pacote é o backend
+  <code>cpu</code> com numba.</div>
+
+  <h3>Ver o hardware</h3>
+<pre><code>double-wiebe devices</code></pre>
+<pre class="txt"><code>CPU: Intel64 Family 6 ...
+Núcleos lógicos: 16
+numba (extra [cpu]): 0.66.0
+CUDA: indisponível (cupy não instalado (pip install double-wiebe[cuda]))
+OpenCL: Intel(R) Iris(R) Xe Graphics (FP64: NÃO)
+Backends disponíveis: cpu, cpu-parallel, serial</code></pre>
+</section>
+
+<!-- ================================================================= -->
+<section id="api">
+  <h2>9. Uso como biblioteca</h2>
+<pre><code>from double_wiebe.models import load_config
+from double_wiebe.data_processing import read_table, prepare_series
+from double_wiebe.simulation import run_simulation
+
+cfg = load_config("configs/example.yaml")
+dfr = read_table("data/example_pressure.txt")
+theta, P, resumo = prepare_series(
+    dfr, angle_unit="radianos", pressure_unit="bar",
+    theta_min=-2.0, theta_max=2.0)
+res = run_simulation(theta, P, cfg["engine"], cfg["wiebe"], cfg["simulation"])
+print(res.metrics["RMSE_kPa"], res.metrics["R2"])
+
+from double_wiebe.calibration import run_calibration, CalibrationConfig
+calib = CalibrationConfig(method="differential-evolution",
+                          selected=["Rc", "m1", "alpha"], seed=42)
+resultado = run_calibration(theta, P, cfg["engine"], cfg["wiebe"],
+                            cfg["simulation"], calib)</code></pre>
+  <p>Todas as exportações ficam em <code>double_wiebe.reporting</code>
+  (<code>results_csv_bytes</code>, <code>metrics_json_bytes</code>,
+  <code>static_plots</code>, <code>report_html_bytes</code>,
+  <code>export_all</code> etc.).</p>
+</section>
+
+<!-- ================================================================= -->
+<section id="saidas">
+  <h2>10. Exportações</h2>
+  <table>
+    <tr><th>Arquivo</th><th>Conteúdo</th></tr>
+    <tr><td><code>results.csv</code></td><td>14 colunas (θ rad/grau, P exp/sim,
+        resíduo, T, calor de parede, volume, x<sub>b</sub> por fase e total,
+        taxas dQ/dθ); separador <code>;</code> (abre direto no Excel pt-BR)</td></tr>
+    <tr><td><code>parameters.yaml</code></td><td>snapshot de engine/wiebe/
+        simulation usados</td></tr>
+    <tr><td><code>metrics.json</code></td><td>métricas (SSE, RMSE, MAE, R²,
+        erro máximo) + indicadores + calibração (quando houver)</td></tr>
+    <tr><td><code>convergence.csv</code></td><td>histórico do RMSE e dos
+        parâmetros por iteração (só com calibração)</td></tr>
+    <tr><td><code>pressure_comparison.png / .pdf</code></td><td>pressão
+        simulada × experimental (+ fases); o PDF contém as 4 figuras</td></tr>
+    <tr><td><code>heat_release.png</code></td><td>taxas de liberação de calor
+        por fase e total</td></tr>
+    <tr><td><code>burned_fraction.png</code></td><td>fração queimada por fase
+        e total</td></tr>
+    <tr><td><code>pv_diagram.png</code></td><td>diagrama P–V (numérico ×
+        experimental)</td></tr>
+    <tr><td><code>report.html</code></td><td>relatório autocontido (imagens
+        embutidas em base64) — sempre gerado com as 4 figuras</td></tr>
+    <tr><td><code>benchmark_hpc.csv</code></td><td>resultado do benchmark dos
+        backends (quando <code>--benchmark</code>)</td></tr>
+  </table>
+</section>
+
+<!-- ================================================================= -->
+<section id="testes">
+  <h2>11. Testes</h2>
+<pre><code>python -m pytest tests -q              <em># suíte completa (112 testes)</em>
+python -m pytest tests -m "not slow" -q <em># sem os testes longos</em></code></pre>
+  <p>Cobrem: Wiebe (redução ao Single Wiebe, monotonia, derivadas),
+  geometria, termodinâmica, simulação, calibração (DE/PSO), backends
+  (<code>cpu-parallel</code> bit-idêntico à serial; RK4 em lote validado),
+  paridade com o Mathematica (<code>validation/</code>), CLI e relatórios.</p>
+</section>
+
+<!-- ================================================================= -->
+<section id="solucao-problemas">
+  <h2>12. Solução de problemas</h2>
+  <table>
+    <tr><th>Sintoma</th><th>Causa e solução</th></tr>
+    <tr><td><code>double-wiebe</code> não é reconhecido</td><td>ambiente
+        virtual não ativado ou pacote não instalado — repita
+        <code>pip install -e .</code> dentro do <code>.venv</code></td></tr>
+    <tr><td>“esperado um arquivo salvo pela GUI” ao abrir JSON</td><td>arquivo
+        de outro projeto (formato <code>single-wiebe-calibracao</code>) ou
+        truncado — os formatos dos dois projetos não são intercambiáveis</td></tr>
+    <tr><td><code>CUDA: indisponível</code> no painel/devices</td><td>normal
+        sem cupy — e não acelera nada de qualquer forma (ver
+        <a href="#hpc">§ 8</a>); instale <code>.[cuda]</code> só para a
+        detecção exibir a GPU</td></tr>
+    <tr><td>calibração lenta na <code>serial</code></td><td>use
+        <code>--backend cpu</code> (com <code>.[cpu]</code>) ou
+        <code>--backend auto</code>; instale numba para o melhor ganho</td></tr>
+    <tr><td>relatório HTML sem figuras</td><td>não deve ocorrer — o botão
+        gera as figuras na hora; se ocorrer, gere os PNGs com
+        <code>double-wiebe plot outputs/run_01</code> ou reabra a GUI</td></tr>
+    <tr><td>GUI congela durante a calibração</td><td>a busca roda em thread
+        separada com progresso; aguarde — o polling re-renderiza a cada
+        ~1 s; <b>Cancel calibration</b> encerra entre iterações</td></tr>
+    <tr><td>pressões com valores deslocados</td><td>confira a unidade
+        (<code>data.pressure_unit</code>) e a coluna
+        (<code>data.pressure_col</code>) — o exemplo usa <b>bar</b></td></tr>
+  </table>
+</section>
+
+</main>
+</body>
+</html>

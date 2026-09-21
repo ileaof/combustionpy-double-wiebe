@@ -11,6 +11,10 @@ combustão interna de pistão.
 
 Extensão do projeto Single Wiebe: <https://github.com/ileaof/combustionpy-single-wiebe>
 
+📖 **Ajuda passo a passo (GUI, CLI, calibração, exportações)**: abra
+[`Help.html`](Help.html) — relatório autocontido em português, mesmo guia
+visual do projeto Single Wiebe.
+
 ---
 
 ## 1. Instalação
