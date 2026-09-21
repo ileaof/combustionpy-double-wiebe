@@ -19,11 +19,13 @@ import io
 import math
 import threading
 import time
+from pathlib import Path
 from typing import Dict
 
 import numpy as np
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 
 from double_wiebe.calibration import PARAM_SPECS, apply_calibrated
 from double_wiebe.backends import hardware_report
@@ -124,7 +126,35 @@ def _calib_worker(theta, P, engine, wiebe, sim, calib, bounds,
 # =============================================================================
 # Cabeçalho
 # =============================================================================
-st.title("🔥 Double Wiebe Combustion Analysis")
+HELP_PATH = Path(__file__).resolve().parents[2] / "Help.html"
+
+
+@st.dialog("📖 Ajuda — Double Wiebe", width="large")
+def _dialogo_ajuda(html: str) -> None:
+    """Mostra o Help.html do repositório dentro da GUI."""
+    st.download_button("⬇ Baixar Help.html (abrir no navegador)",
+                       html.encode("utf-8"), file_name="Help.html",
+                       mime="text/html")
+    if hasattr(st, "iframe"):          # Streamlit >= 1.52
+        st.iframe(html, height=650)
+    else:
+        components.html(html, height=650, scrolling=True)
+
+
+def _botao_ajuda() -> None:
+    """Botão 📖 Ajuda do cabeçalho (abre o guia passo a passo)."""
+    if st.button("📖 Ajuda", help="Abre o guia passo a passo (Help.html)",
+                 key="botao_ajuda"):
+        if HELP_PATH.exists():
+            _dialogo_ajuda(HELP_PATH.read_text(encoding="utf-8"))
+        else:
+            st.warning("Help.html não encontrado — ele fica na raiz do repositório (instale com pip install -e . a partir do clone).")
+
+
+col_titulo, col_ajuda = st.columns([6, 1], vertical_alignment="center")
+col_titulo.title("🔥 Double Wiebe Combustion Analysis")
+with col_ajuda:
+    _botao_ajuda()
 st.caption(DESCRIPTION_EN)
 st.divider()
 
