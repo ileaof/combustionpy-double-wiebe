@@ -341,9 +341,10 @@ def _run_least_squares(
         method="trf", xtol=calib.tol, ftol=calib.tol, gtol=calib.tol,
         max_nfev=max(calib.maxiter, 1) * 10,
     )
-    # least_squares minimiza 0.5*Σr²; converte de volta para RMSE
+    # least_squares minimiza cost = 0.5*Σr²  =>  RMSE = √(2·cost / n)
     return {
-        "x": result.x.copy(), "fun": float(np.sqrt(2.0 * result.cost)),
+        "x": result.x.copy(),
+        "fun": float(np.sqrt(2.0 * result.cost / theta_exp.size)),
         "nit": int(result.nfev), "history": [], "history_params": [],
         "cancelado": False, "success": bool(result.success),
         "message": str(result.message),
@@ -496,6 +497,7 @@ def run_calibration(
             lower_full[j], upper_full[j] = float(bounds[nome][0]), float(
                 bounds[nome][1])
 
+    iniciais_ajustados: List[str] = []
     if calib.method == "pso":
         resultado = _run_pso(objective, lower, upper, calib,
                              progress_callback, cancel_check,
@@ -505,9 +507,14 @@ def run_calibration(
                             progress_callback, cancel_check,
                             eval_batch=eval_batch)
     elif calib.method == "least-squares":
+        # ponto inicial = valores atuais; se estiverem fora dos limites
+        # escolhidos, são trazidos para dentro (o scipy recusaria x0)
+        x0 = np.clip(full0[idx], lower, upper)
+        iniciais_ajustados = [n for n, a, b in zip(selected, full0[idx], x0)
+                              if a != b]
         resultado = _run_least_squares(
             theta_exp, P_exp, engine, wiebe, sim, calib, selected,
-            lower, upper, full0[idx])
+            lower, upper, x0)
     else:  # pragma: no cover — validado em CalibrationConfig
         raise CalibrationError(f"Método desconhecido: {calib.method}")
 
@@ -518,14 +525,8 @@ def run_calibration(
     # referência serial (solve_ivp), SEMPRE ------------------------------
     rmse_integrador = float(resultado["fun"])
     rmse_best = float(objective(x_sel))
+    # RK4 em lote × solve_ivp no mesmo candidato (antes do refinamento)
     dif_integrador = abs(rmse_best - rmse_integrador)
-    if backend is not None:
-        resultado["fun"] = rmse_best
-
-    # --- validação numérica (regra 4): re-run do melhor candidato com a
-    # referência serial (solve_ivp), SEMPRE ------------------------------
-    rmse_integrador = float(resultado["fun"])
-    rmse_best = float(objective(x_sel))
     if backend is not None:
         resultado["fun"] = rmse_best
 
@@ -542,13 +543,13 @@ def run_calibration(
                 if f_ref < resultado["fun"]:
                     polish = {"rmse": float(f_ref), "aplicado": True}
                     x_sel, x_full = np.asarray(x_ref), expand(x_ref)
+                    resultado["fun"] = float(f_ref)   # relata o refinado
                 else:
                     polish = {"rmse": float(f_ref), "aplicado": False}
             except Exception as e:                # refinamento é opcional
                 polish = {"erro": str(e), "aplicado": False}
 
         rmse_best = float(resultado["fun"])
-        dif_integrador = abs(rmse_best - rmse_integrador)
         eng_cal, wieb_cal = _params_from_vector(
             x_full, PARAM_ORDER, engine, wiebe)
 
@@ -563,6 +564,10 @@ def run_calibration(
 
         # Alertas
         alertas: List[str] = []
+        if iniciais_ajustados:
+            alertas.append(
+                "⚠ Valor inicial fora dos limites escolhidos, levado para a "
+                f"borda antes do least-squares: {', '.join(iniciais_ajustados)}.")
         for i, nome in enumerate(selected):
             lo, hi = lower[i], upper[i]
             span = hi - lo

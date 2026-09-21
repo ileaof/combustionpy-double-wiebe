@@ -301,6 +301,7 @@ def calibrate(
 ):
     """Calibra os parâmetros selecionados (RMSE + regularização) e roda a
     simulação final com o resultado calibrado."""
+    from .calibration import CalibrationError, run_calibration
     try:
         overrides = _parse_sets(set_opt)
         if method is not None:
@@ -333,8 +334,6 @@ def calibrate(
             ang_unit=ang_unit, press_unit=press_unit,
             theta_min=theta_min, theta_max=theta_max)
         out = _output_dir(output, overwrite)
-
-        from .calibration import CalibrationError, run_calibration
 
         # Benchmark reproduzível antes da calibração (regra 7 do plano HPC)
         if benchmark:

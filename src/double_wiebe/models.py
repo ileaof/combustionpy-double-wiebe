@@ -383,6 +383,17 @@ def save_config_yaml(path: str | Path, engine: EngineConfig,
     return p
 
 
+def _merge_dicts(base: Dict[str, Any], extra: Dict[str, Any]) -> Dict[str, Any]:
+    """Mescla recursiva: valores de `extra` prevalecem sobre `base`."""
+    out = dict(base)
+    for k, v in extra.items():
+        if isinstance(v, dict) and isinstance(out.get(k), dict):
+            out[k] = _merge_dicts(out[k], v)
+        else:
+            out[k] = v
+    return out
+
+
 def _apply_overrides(d: Dict[str, Any], overrides: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     """Aplica sobrescritas "secao.chave=valor" ao dicionário de configuração."""
     if not overrides:
@@ -411,13 +422,17 @@ def load_config(
     Os ângulos do YAML estão em graus; aqui são convertidos para radianos
     nas chaves esperadas pelos dataclasses.
     """
+    padrao = _config_to_dict(EngineConfig(), WiebeParameters(),
+                             SimulationConfig(), CalibrationConfig())
     if path is not None:
-        raw = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
-        if not isinstance(raw, dict):
+        lido = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+        if not isinstance(lido, dict):
             raise ValueError(f"Arquivo YAML inválido: {path}")
+        # o YAML pode omitir chaves (ex.: calibration.backend): mescla sobre
+        # os padrões para que toda chave válida possa ser sobrescrita
+        raw = _merge_dicts(padrao, lido)
     else:
-        raw = _config_to_dict(EngineConfig(), WiebeParameters(),
-                              SimulationConfig(), CalibrationConfig())
+        raw = padrao
     raw = _apply_overrides(raw, overrides)
 
     eng = raw.get("engine", {})

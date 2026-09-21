@@ -259,6 +259,16 @@ with TAB_DADOS:
             st.session_state.data_theta = theta
             st.session_state.data_press = P
             st.session_state.data_name = upload.name
+            # Faixa típica de um ensaio: dezenas a centenas de graus em torno
+            # do PMS. Faixa minúscula = unidade angular trocada.
+            faixa_graus = float(np.degrees(np.ptp(theta))) if theta.size else 0
+            if faixa_graus < 20.0:
+                st.warning(
+                    f"θ cobre só {faixa_graus:.2f}° após a conversão — confira "
+                    f"a **Unidade do ângulo** (escolhida: {ang_unit}). Se o "
+                    "arquivo está em radianos (ex.: −2,2 a 2,2), escolha "
+                    "“radianos”; com a unidade errada a calibração não "
+                    "converge (R² negativo).")
             st.session_state.data_summary = resumo
             st.session_state.data_preview = df.head(15)
 
@@ -586,17 +596,29 @@ with TAB_CALIB:
             polish_cal = st.checkbox("Refinamento least-squares final",
                                      value=True, key="calib_polish")
         with st.expander("Limites por parâmetro (selecionados)"):
+            st.caption("Ângulos (theta01, delta1, theta02, delta2) em GRAUS, "
+                       "como na aba Double Wiebe; são convertidos para "
+                       "radianos internamente.")
             limites_ui: Dict[str, tuple] = {}
             for nome in selecionados:
                 spec = PARAM_SPECS[nome]
+                angular = spec["unit"] == "rad"
+                conv = math.degrees if angular else float
+                unid = "°" if angular else spec["unit"]
                 lc1, lc2 = st.columns(2)
                 with lc1:
-                    lo = st.number_input(f"{nome} mín", value=float(spec["lower"]),
-                                         key=f"lim_lo_{nome}")
+                    lo = st.number_input(f"{nome} mín [{unid}]",
+                                         value=round(conv(spec["lower"]), 6),
+                                         format="%.4f",
+                                         key=f"lim_lo_{nome}_{unid}")
                 with lc2:
-                    hi = st.number_input(f"{nome} máx", value=float(spec["upper"]),
-                                         key=f"lim_hi_{nome}")
-                limites_ui[nome] = (lo, hi)
+                    hi = st.number_input(f"{nome} máx [{unid}]",
+                                         value=round(conv(spec["upper"]), 6),
+                                         format="%.4f",
+                                         key=f"lim_hi_{nome}_{unid}")
+                # guarda em radianos (unidade interna do núcleo)
+                limites_ui[nome] = ((math.radians(lo), math.radians(hi))
+                                    if angular else (lo, hi))
 
         # --- Desempenho (plano HPC) --------------------------------------
         with st.expander("Desempenho (backend de computação)"):
@@ -653,7 +675,8 @@ with TAB_CALIB:
             limites = {}
             for nome, (lo, hi) in limites_ui.items():
                 if lo >= hi:
-                    st.error(f"Limites inválidos para {nome}: ({lo}, {hi}).")
+                    st.error(f"Limites inválidos para {nome}: o mínimo deve "
+                             "ser menor que o máximo.")
                     break
                 limites[nome] = (lo, hi)
             else:
